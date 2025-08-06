@@ -346,6 +346,11 @@ class Karel(object):
         return success
 
     @hero_action
+    def move_twice(self):
+        '''Move twice'''
+        return self.move() and self.move()
+
+    @hero_action
     def push_obstacle(self):
         '''Push an obstacle'''
         if not self.can_push():

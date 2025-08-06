@@ -61,6 +61,7 @@ TOKENS_SYNTHESIS_COMMON = [
     "M_RBRACE",
     "INT",  #'NEWLINE', 'SEMI',
     "MOVE",
+    "MOVE_TWICE",
     "TURN_RIGHT",
     "TURN_LEFT",
     "PUSH_OBSTACLE",

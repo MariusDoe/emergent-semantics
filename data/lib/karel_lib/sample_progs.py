@@ -44,6 +44,7 @@ def generate_random_with_distribution(
             "pick_marker": 2,
             "put_marker": 2,
             "move": 5,
+            "move_twice": 2,
             "turn_right": 3,
             "turn_left": 3,
             "push_obstacle": 2,

@@ -29,6 +29,7 @@ class KarelWithCurlyParser(Parser):
         "NO_MARKERS_PRESENT",
         "NOT",
         "MOVE",
+        "MOVE_TWICE",
         "TURN_RIGHT",
         "TURN_LEFT",
         "PICK_MARKER",
@@ -67,6 +68,7 @@ class KarelWithCurlyParser(Parser):
     ]
 
     t_MOVE = "move"
+    t_MOVE_TWICE = "move_twice"
     t_TURN_RIGHT = "turn_right"
     t_TURN_LEFT = "turn_left"
     t_PICK_MARKER = "pick_marker"
@@ -307,6 +309,7 @@ class KarelWithCurlyParser(Parser):
 
     def p_action(self, p):
         """action : MOVE LPAREN RPAREN
+        | MOVE_TWICE LPAREN RPAREN
         | TURN_RIGHT LPAREN RPAREN
         | TURN_LEFT LPAREN RPAREN
         | PICK_MARKER LPAREN RPAREN
