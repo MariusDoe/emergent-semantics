@@ -14,7 +14,10 @@ def generate_random_with_distribution(
     no_noops=False,
     stmt_weights=None,
     cond_weights=None,
-    force_push_obstacle=False,
+    use_move_twice=False,
+    use_push_obstacle=False,
+    force_action=None,
+    force_interesting_pushes=False,
 ):
     """
     Return a list of programs whose lengths follow distribution
@@ -39,15 +42,22 @@ def generate_random_with_distribution(
     """
     distribution = list(distribution)  # don't mutate distribution
 
+    if force_interesting_pushes:
+        force_action = "push_obstacle"
+    if force_action == "push_obstacle":
+        use_push_obstacle = True
+    if force_action == "move_twice":
+        use_move_twice = True
+
     if stmt_weights is None:
         stmt_weights = {
             "pick_marker": 2,
             "put_marker": 2,
             "move": 5,
-            "move_twice": 2,
+            "move_twice": 2 if use_move_twice else 0,
             "turn_right": 3,
             "turn_left": 3,
-            "push_obstacle": 2,
+            "push_obstacle": 2 if use_push_obstacle else 0,
             "if": 1,
             "ifelse": 1,
         }
@@ -197,19 +207,14 @@ def generate_random_with_distribution(
         record = {}
         np_record = {}
 
-        if force_push_obstacle:
-            while True:
-                body = generate_stmts(random_len, [])
-                if "push_obstacle" in body:
-                    break
-        else:
-            start_states = make_states(num_states=10)
+        start_states = [] if force_interesting_pushes else make_states(num_states=10)
+        while True:
             states = copy.deepcopy(start_states)[:5]
             body = generate_stmts(random_len, states)
+            if not force_action or force_action in body:
+                break
         program = f"def run() {{ {body} }}"
-        if force_push_obstacle:
-            start_states = []
-            states = []
+        if force_interesting_pushes:
             while len(start_states) < 10:
                 [start_state] = make_states(num_states=1)
                 state = copy.deepcopy(start_state)
