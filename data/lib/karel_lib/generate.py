@@ -25,6 +25,7 @@ if __name__ == "__main__":
     data_arg.add_argument("--no_conditionals", action="store_true")
     data_arg.add_argument("--no_markers", action="store_true")
     data_arg.add_argument("--no_noops", action="store_true")
+    data_arg.add_argument("--force_push_obstacle", action="store_true")
     data_arg.add_argument("--uniform", action="store_true")
     data_arg.add_argument("--data_dir", type=str, default="karel")
     data_arg.add_argument("--max_length", type=int, default=10)
@@ -98,7 +99,7 @@ if __name__ == "__main__":
         np_records = []
 
         progs = generate_random_with_distribution(
-            distribution, no_noops=config.no_noops, stmt_weights=stmt_weights
+            distribution, no_noops=config.no_noops, stmt_weights=stmt_weights, force_push_obstacle=config.force_push_obstacle
         )
         for code, record, np_record in progs:
             if config.beautify:

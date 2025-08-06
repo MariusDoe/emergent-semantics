@@ -14,6 +14,7 @@ def generate_random_with_distribution(
     no_noops=False,
     stmt_weights=None,
     cond_weights=None,
+    force_push_obstacle=False,
 ):
     """
     Return a list of programs whose lengths follow distribution
@@ -195,14 +196,31 @@ def generate_random_with_distribution(
         record = {}
         np_record = {}
 
-        start_states = make_states(num_states=10)
+        if force_push_obstacle:
+            while True:
+                body = generate_stmts(random_len, [])
+                if "push_obstacle" in body:
+                    break
+        else:
+            start_states = make_states(num_states=10)
+            states = copy.deepcopy(start_states)[:5]
+            body = generate_stmts(random_len, states)
+        program = f"def run() {{ {body} }}"
+        if force_push_obstacle:
+            start_states = []
+            states = []
+            while len(start_states) < 10:
+                [start_state] = make_states(num_states=1)
+                state = copy.deepcopy(start_state)
+                parser.karel = state
+                parser.run(program)
+                if state.num_interesting_pushes > 0:
+                    start_states.append(start_state)
+                    states.append(state)
         for idx in range(len(start_states)):
             record[f"input{idx}"] = karel_to_string(start_states[idx])
             np_record[f"input{idx}"] = start_states[idx].state
 
-        states = copy.deepcopy(start_states)[:5]
-        body = generate_stmts(random_len, states)
-        program = f"def run() {{ {body} }}"
         for idx in range(len(start_states)):
             parser.karel = start_states[idx]
             parser.run(program)

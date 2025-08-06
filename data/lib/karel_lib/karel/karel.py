@@ -97,6 +97,8 @@ class Karel(object):
         self.max_marker = 10
         self.hero_direction = 4
 
+        self.num_interesting_pushes = 0
+
         self.zero_state = np.tile(
             np.expand_dims(state, -1),
             [1, 1, self.hero_direction + 1 + (self.max_marker + 1)],
@@ -348,6 +350,8 @@ class Karel(object):
         '''Push an obstacle'''
         if not self.can_push():
             return False
+        if not self._front_is_clear():
+            self.num_interesting_pushes += 1
         assert self._push_implementation(do_push = True)
         self.hero.move()
         return True
