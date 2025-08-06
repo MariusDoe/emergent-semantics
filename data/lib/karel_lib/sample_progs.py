@@ -45,6 +45,7 @@ def generate_random_with_distribution(
             "move": 5,
             "turn_right": 3,
             "turn_left": 3,
+            "push_obstacle": 2,
             "if": 1,
             "ifelse": 1,
         }

@@ -36,6 +36,7 @@ class KarelForSynthesisParser(Parser):
         "TURN_LEFT",
         "PICK_MARKER",
         "PUT_MARKER",
+        "PUSH_OBSTACLE",
     ]
 
     t_ignore = " \t\n"
@@ -86,6 +87,7 @@ class KarelForSynthesisParser(Parser):
     t_TURN_LEFT = "turnLeft"
     t_PICK_MARKER = "pickMarker"
     t_PUT_MARKER = "putMarker"
+    t_PUSH_OBSTACLE = "pushObstacle"
 
     action_functions = [
         t_MOVE,
@@ -93,6 +95,7 @@ class KarelForSynthesisParser(Parser):
         t_TURN_LEFT,
         t_PICK_MARKER,
         t_PUT_MARKER,
+        t_PUSH_OBSTACLE,
     ]
 
     #########
@@ -353,6 +356,7 @@ class KarelForSynthesisParser(Parser):
         | TURN_LEFT
         | PICK_MARKER
         | PUT_MARKER
+        | PUSH_OBSTACLE
         """
         action = p[1]
         karel = self.karel

@@ -33,6 +33,7 @@ class KarelWithCurlyParser(Parser):
         "TURN_LEFT",
         "PICK_MARKER",
         "PUT_MARKER",
+        "PUSH_OBSTACLE",
     ]
 
     t_ignore = " \t\n"
@@ -70,6 +71,7 @@ class KarelWithCurlyParser(Parser):
     t_TURN_LEFT = "turn_left"
     t_PICK_MARKER = "pick_marker"
     t_PUT_MARKER = "put_marker"
+    t_PUSH_OBSTACLE = "push_obstacle"
 
     action_functions = [
         t_MOVE,
@@ -77,6 +79,7 @@ class KarelWithCurlyParser(Parser):
         t_TURN_LEFT,
         t_PICK_MARKER,
         t_PUT_MARKER,
+        t_PUSH_OBSTACLE,
     ]
 
     #########
@@ -308,6 +311,7 @@ class KarelWithCurlyParser(Parser):
         | TURN_LEFT LPAREN RPAREN
         | PICK_MARKER LPAREN RPAREN
         | PUT_MARKER LPAREN RPAREN
+        | PUSH_OBSTACLE LPAREN RPAREN
         """
         action = p[1]
 

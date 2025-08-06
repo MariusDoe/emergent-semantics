@@ -44,6 +44,7 @@ if __name__ == "__main__":
         "move": 5,
         "turn_right": 3,
         "turn_left": 3,
+        "push_obstacle": 2,
         "if": 1,
         "ifelse": 1,
     }

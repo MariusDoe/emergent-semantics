@@ -344,6 +344,15 @@ class Karel(object):
         return success
 
     @hero_action
+    def push_obstacle(self):
+        '''Push an obstacle'''
+        if not self.can_push():
+            return False
+        assert self._push_implementation(do_push = True)
+        self.hero.move()
+        return True
+
+    @hero_action
     def turn_left(self):
         """Turn left"""
         self.hero.turn_left()
@@ -389,6 +398,33 @@ class Karel(object):
 
     def _front_is_clear(self):
         return self.char_in_front() == "."
+
+    def _is_in_bounds(self, x, y):
+        height = len(self.world)
+        width = len(self.world[0])
+        return min(x, y) >= 0 and x < width and y < height
+
+    def _push_implementation(self, do_push):
+        next_x = self.hero.position[0]
+        next_y = self.hero.position[1]
+        pushing = self.EMPTY_CHAR
+        while True:
+            next_x += self.hero.facing[0]
+            next_y += self.hero.facing[1]
+            if not self._is_in_bounds(next_x, next_y):
+                return False
+            next_pushing = self.world[next_y][next_x]
+            if do_push:
+                self.world[next_y][next_x] = pushing
+                if pushing == self.WALL_CHAR:
+                    self.markers = [marker for marker in self.markers if marker != (next_x, next_y)]
+                pushing = next_pushing
+            if next_pushing != self.WALL_CHAR:
+                return True
+
+    @world_condition
+    def can_push(self):
+        return self._push_implementation(do_push = False)
 
     @world_condition
     def left_is_clear(self):
