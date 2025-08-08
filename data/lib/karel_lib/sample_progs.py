@@ -14,8 +14,6 @@ def generate_random_with_distribution(
     no_noops=False,
     stmt_weights=None,
     cond_weights=None,
-    use_move_twice=False,
-    use_push_obstacle=False,
     force_action=None,
     force_interesting_pushes=False,
 ):
@@ -42,22 +40,13 @@ def generate_random_with_distribution(
     """
     distribution = list(distribution)  # don't mutate distribution
 
-    if force_interesting_pushes:
-        force_action = "push_obstacle"
-    if force_action == "push_obstacle":
-        use_push_obstacle = True
-    if force_action == "move_twice":
-        use_move_twice = True
-
     if stmt_weights is None:
         stmt_weights = {
             "pick_marker": 2,
             "put_marker": 2,
             "move": 5,
-            "move_twice": 2 if use_move_twice else 0,
             "turn_right": 3,
             "turn_left": 3,
-            "push_obstacle": 2 if use_push_obstacle else 0,
             "if": 1,
             "ifelse": 1,
         }

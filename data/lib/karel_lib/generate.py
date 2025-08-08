@@ -42,20 +42,29 @@ if __name__ == "__main__":
     )
     config = data_arg.parse_args()
 
+    if config.force_interesting_pushes:
+        config.force_action = "push_obstacle"
+    if config.force_action == "push_obstacle":
+        config.use_push_obstacle = True
+    if config.force_action == "move_twice":
+        config.use_move_twice = True
+
     stmt_weights = {
         "pick_marker": 2,
         "put_marker": 2,
         "move": 5,
-        "move_twice": 2,
         "turn_right": 3,
         "turn_left": 3,
-        "push_obstacle": 2,
         "if": 1,
         "ifelse": 1,
     }
 
     # Make directories
     data_dir = os.path.join("data", config.data_dir)
+    if config.use_move_twice:
+        stmt_weights["move_twice"] = 2
+    if config.use_push_obstacle:
+        stmt_weights["push_obstacle"] = 2
     if config.uniform:
         data_dir += "_uniform"
         for key in stmt_weights:
@@ -106,8 +115,6 @@ if __name__ == "__main__":
             distribution,
             no_noops=config.no_noops,
             stmt_weights=stmt_weights,
-            use_move_twice=config.use_move_twice,
-            use_push_obstacle=config.use_push_obstacle,
             force_action=config.force_action,
             force_interesting_pushes=config.force_interesting_pushes,
         )
