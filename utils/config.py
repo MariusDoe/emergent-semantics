@@ -75,6 +75,7 @@ class Config:
         self.split = args.split
         self.forced_decoding = args.forced_decode
         self.grammar_decoding = args.grammar_decode
+        self.new_actions = args.new_actions
 
         # if self.mode == "synthesis":
         assert not self.grammar_decoding or not self.forced_decoding
@@ -464,6 +465,12 @@ class Config:
             "--debug",
             action="store_true",
             help="Debug run.",
+        )
+        parser.add_argument(
+            "--new_actions",
+            nargs="*",
+            default=[],
+            help="New action tokens to be added to the tokenizer after the checkpoint was loaded."
         )
 
     @staticmethod

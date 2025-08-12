@@ -92,17 +92,17 @@ def get_token_id(token, tokenizer):
 
 
 @torch.no_grad()
-def make_lr_grammar(tokenizer, sample_spec, mode="synthesis"):
+def make_lr_grammar(tokenizer, sample_spec, new_actions, mode="synthesis"):
     g = {
         "synthesis": _make_lr_grammar_synthesis,
         "interp": _make_lr_grammar_interp,
     }.get(mode, None)
     if g is None:
         raise ValueError("{mode=} not in grammars")
-    return g(tokenizer, sample_spec)
+    return g(tokenizer, sample_spec, new_actions)
 
 
-def _make_lr_grammar_interp(tokenizer, sample_spec):
+def _make_lr_grammar_interp(tokenizer, sample_spec, new_actions):
     """Make an lr grammar for interp responses.
 
     For interp,
@@ -210,7 +210,7 @@ def _make_lr_grammar_interp(tokenizer, sample_spec):
     return lr_grammar
 
 
-def _make_lr_grammar_synthesis(tokenizer, sample_spec):
+def _make_lr_grammar_synthesis(tokenizer, sample_spec, new_actions):
     """Make an lr grammar for synthesis responses.
 
     For synthesis,
@@ -253,7 +253,7 @@ def _make_lr_grammar_synthesis(tokenizer, sample_spec):
     example_action = body_tokenized[:tokens_per_action]
 
     # Finally, infer the grammar for the body
-    action_tokens = [token_to_id(token) for token in ACTION_TOKENS]
+    action_tokens = [token_to_id(token) for token in ACTION_TOKENS + new_actions]
     is_token = [ea in action_tokens for ea in example_action]
     assert sum(is_token) == 1
 
@@ -301,43 +301,24 @@ def _make_lr_grammar_synthesis(tokenizer, sample_spec):
 
     return lr_grammar
 
-
-def add_special_tokens(
+def add_tokens(
     tokenizer,
+    new_tokens,
     model=None,
     initialize_embeddings=True,
-    add_conditionals=False,
-    mode="synthesis",
 ):
-    """Adds special tokens, and also resizes model embedding if passed in."""
     orig_tokenizer = copy.deepcopy(tokenizer)
     old_count = len(tokenizer)
-
-    new_tokens = ["\n"]
-    new_tokens += DEFAULT_TOKENS
-    new_tokens += ACTION_TOKENS
-    if add_conditionals:
-        new_tokens += CONDITIONAL_TOKENS
-    new_tokens += [f"__{i}_Marker__" for i in range(1, 10)]
-    for i in range(10):
-        new_tokens.append(f"Input{i}")
-        new_tokens.append(f"Output{i}")
     tokenizer.add_tokens(new_tokens)
     new_count = len(tokenizer)
     print(f"Added {new_count - old_count} tokens.")
-
-    tokenizer.bos_token = "Examples:"
-    tokenizer.pad_token = PAD_TOKEN
-    tokenizer.eos_token = "}" if mode == "synthesis" else EOS_TOKEN
-    tokenizer.padding_side = "right"
-
     if model is None:
-        return new_tokens
+        return
 
     model.resize_token_embeddings(len(tokenizer))
 
     if not initialize_embeddings:
-        return new_tokens
+        return
 
     # initialize new embedding weights as mean of original tokens
     weights = model.transformer.wte.weight
@@ -352,8 +333,29 @@ def add_special_tokens(
             emb.append(weight_mean)
         weights[-len(new_tokens) :, :] = torch.vstack(emb).requires_grad_()
 
-    return new_count
+    return
 
+def add_special_tokens(
+    tokenizer,
+    add_conditionals=False,
+    mode="synthesis",
+    **kwargs,
+):
+    """Adds special tokens, and also resizes model embedding if passed in."""
+    new_tokens = ["\n"]
+    new_tokens += DEFAULT_TOKENS
+    new_tokens += ACTION_TOKENS
+    if add_conditionals:
+        new_tokens += CONDITIONAL_TOKENS
+    new_tokens += [f"__{i}_Marker__" for i in range(1, 10)]
+    for i in range(10):
+        new_tokens.append(f"Input{i}")
+        new_tokens.append(f"Output{i}")
+    add_tokens(tokenizer, new_tokens, **kwargs)
+    tokenizer.bos_token = "Examples:"
+    tokenizer.pad_token = PAD_TOKEN
+    tokenizer.eos_token = "}" if mode == "synthesis" else EOS_TOKEN
+    tokenizer.padding_side = "right"
 
 def get_active_examples(
     num_examples, active_examples, randomize_active, use_alt=False, alt_active=None

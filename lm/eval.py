@@ -546,7 +546,7 @@ def eval_with_config_and_model(
             alt_active=config.eval_alt_active,
             mode=mode,
         )["spec"]
-        lr_grammar = karel.make_lr_grammar(tokenizer, spec, mode=mode)
+        lr_grammar = karel.make_lr_grammar(tokenizer, spec, config.new_actions, mode=mode)
     else:
         lr_grammar = None
 
