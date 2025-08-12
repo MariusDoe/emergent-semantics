@@ -22,6 +22,8 @@ def parse_args():
         choices=[
             "intervention",
             "causal",
+            "generate",
+            "force_decode",
         ],
     )
 
