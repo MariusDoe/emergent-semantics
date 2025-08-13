@@ -537,7 +537,7 @@ class Config:
         )
 
         parser.add_argument(
-            "--split", type=str, default="test", choices=["test", "train"]
+            "--split", type=str, default="test", choices=["test", "train", "val"]
         )
 
         group = parser.add_mutually_exclusive_group()
