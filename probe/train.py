@@ -346,7 +346,7 @@ def train_with_config(
         print(f"WARNING: train and eval on same split={train_split}!")
 
     try:
-        tokenizer = model_utils.load_pretrained(config, load_tokenizer_only=True)
+        tokenizer = model_utils.load_pretrained(config, load_tokenizer_only=True, add_new_actions=True)
     except:
         print("could not load tokenizer, reconstructing.")
         args = torch.load(f"{config.train_base_dir}/args.pt")
@@ -357,6 +357,7 @@ def train_with_config(
             model=None,
             add_conditionals=add_conditionals
         )
+        karel.add_tokens(tokenizer, config.new_actions)
 
     if config.mlp_layers is None:
         layers = [1, 2, 3]

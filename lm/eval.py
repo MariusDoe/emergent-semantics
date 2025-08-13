@@ -209,7 +209,7 @@ def eval_with_config(
     resume,
 ):
     model, tokenizer = model_utils.load_pretrained(
-        config, load_in_8bit=False, use_fast_tokenizer=True
+        config, load_in_8bit=False, use_fast_tokenizer=True, add_new_actions=True
     )
 
     return eval_with_config_and_model(

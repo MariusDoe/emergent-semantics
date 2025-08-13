@@ -4,6 +4,7 @@ import importlib
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from data import karel
 
 
 def load_arch(arch, load_in_8bit=True, device=None, use_fast_tokenizer=True):
@@ -21,7 +22,7 @@ def load_arch(arch, load_in_8bit=True, device=None, use_fast_tokenizer=True):
 
 
 def load_pretrained(
-    config, load_in_8bit=False, use_fast_tokenizer=True, load_tokenizer_only=False
+    config, load_in_8bit=False, use_fast_tokenizer=True, load_tokenizer_only=False, add_new_actions=False
 ):
     def load_tokenizer():
         tokenizer = AutoTokenizer.from_pretrained(
@@ -32,6 +33,8 @@ def load_pretrained(
         return tokenizer
 
     tokenizer = load_tokenizer()
+    if add_new_actions:
+        karel.add_tokens(tokenizer, config.new_actions)
     if load_tokenizer_only:
         return tokenizer
 
