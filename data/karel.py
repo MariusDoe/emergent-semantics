@@ -307,6 +307,8 @@ def add_tokens(
     model=None,
     initialize_embeddings=True,
 ):
+    if not new_tokens:
+        return
     orig_tokenizer = copy.deepcopy(tokenizer)
     old_count = len(tokenizer)
     tokenizer.add_tokens(new_tokens)

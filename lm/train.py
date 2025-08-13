@@ -671,8 +671,7 @@ def main():
         else:
             checkpoint_path = None
 
-    if config.new_actions:
-        karel.add_tokens(tokenizer, config.new_actions, model)
+    karel.add_tokens(tokenizer, config.new_actions, model)
 
     if checkpoint_path is not None:
         # Extract `epoch_{i}` or `step_{i}`
