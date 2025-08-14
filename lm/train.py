@@ -196,6 +196,11 @@ def parse_args():
             "Only applicable when `--with_tracking` is passed."
         ),
     )
+    parser.add_argument(
+        "--no_full_eval",
+        action="store_true",
+        help="Disable the full eval after every epoch.",
+    )
     args = parser.parse_args()
 
     return args
@@ -226,6 +231,7 @@ def main():
     resume_from_checkpoint = args.resume_from_checkpoint
     with_tracking = args.with_tracking
     report_to = args.report_to
+    no_full_eval = args.no_full_eval
 
     output_dir = config.base_dir
 
@@ -765,10 +771,11 @@ def main():
             if completed_steps >= max_train_steps:
                 break
 
-        acc, perplexity, loss = eval(model, fast=False)
-        logger.info(
-            f"epoch {epoch}: acc: {acc} perplexity: {perplexity} val_loss: {loss}"
-        )
+        if not no_full_eval:
+            acc, perplexity, loss = eval(model, fast=False)
+            logger.info(
+                f"epoch {epoch}: acc: {acc} perplexity: {perplexity} val_loss: {loss}"
+            )
 
         if with_tracking:
             accelerator.log(
