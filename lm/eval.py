@@ -19,6 +19,7 @@ from probe.alt import semantics_transformer
 from utils.cache import CACHE
 from utils.config import Config
 import warnings
+from data.lib.karel_lib.karel import KarelWithCurlyParser
 
 warnings.simplefilter("ignore", UserWarning)
 
@@ -90,6 +91,11 @@ def parse_args():
         action="store_true",
         help="If the evaluation should try to resume first.",
     )
+    parser.add_argument(
+        "--show_responses",
+        action="store_true",
+        help="Show the responses of the LLM"
+    )
     args = parser.parse_args()
 
     return args
@@ -109,6 +115,7 @@ def eval():
     k = args.k
     temperature = args.temperature
     resume = args.resume
+    show_responses = args.show_responses
 
     return eval_with_config(
         config,
@@ -119,6 +126,7 @@ def eval():
         k,
         temperature,
         resume,
+        show_responses=show_responses,
     )
 
 
@@ -207,6 +215,7 @@ def eval_with_config(
     k,
     temperature,
     resume,
+    show_responses=False,
 ):
     model, tokenizer = model_utils.load_pretrained(
         config, load_in_8bit=False, use_fast_tokenizer=True, add_new_actions=True
@@ -223,6 +232,7 @@ def eval_with_config(
         k,
         temperature,
         resume,
+        show_responses=show_responses,
     )
 
 
@@ -268,6 +278,7 @@ def eval_with_config_and_model(
     k,
     temperature,
     resume,
+    show_responses=False,
     max_length=None,
     raw_dataset=None,
     state_dataset=None,
@@ -721,6 +732,27 @@ def eval_with_config_and_model(
                 )
                 for response in responses
             ]
+            if show_responses:
+                print("=" * 20)
+                parser = KarelWithCurlyParser()
+                def format_state(state):
+                    parser.new_game(state=state)
+                    return "\n".join(parser.draw(no_print=True))
+                for spec_input, spec_output in spec_examples:
+                    print("input")
+                    print(format_state(spec_input))
+                    print("output")
+                    print(format_state(spec_output))
+                print("spec code")
+                print(spec_code)
+                print("=" * 20)
+                for response, result in zip(responses, results_for_responses):
+                    print("response")
+                    print(response)
+                    print("results")
+                    print(result["results"])
+                    print("=" * 20)
+
             all_results.append(results_for_responses)
 
             is_correct = 0
