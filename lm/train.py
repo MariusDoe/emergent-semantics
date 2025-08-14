@@ -347,6 +347,7 @@ def main():
             use_alt=config.use_alt,
             alt_active="random",
             mode=config.mode,
+            max_samples=config.max_train_samples,
             **kw,
         )
     else:

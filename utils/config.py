@@ -76,6 +76,7 @@ class Config:
         self.forced_decoding = args.forced_decode
         self.grammar_decoding = args.grammar_decode
         self.new_actions = args.new_actions
+        self.max_train_samples = args.max_train_samples
 
         # if self.mode == "synthesis":
         assert not self.grammar_decoding or not self.forced_decoding
@@ -453,6 +454,12 @@ class Config:
             type=int,
             default=None,
             help="Which alternative semantics to use for the second state (num_examples must be set to 2).",
+        )
+        parser.add_argument(
+            "--max_train_samples",
+            type=int,
+            default=None,
+            help="Maximum number of samples to train on.",
         )
         parser.add_argument(
             "--mode",

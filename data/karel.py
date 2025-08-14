@@ -612,8 +612,12 @@ def load_karel(
     alt_active=None,
     mode="synthesis",
     lengths_to_filter=None,
+    max_samples=None,
 ):
     raw_dataset = load_karel_raw(split, data_folder=dataset_name)
+    if max_samples is not None:
+        for key in raw_dataset.keys():
+            raw_dataset[key] = raw_dataset[key].select(range(min(max_samples, raw_dataset[key].num_rows)))
 
     # Infer the max number of examples if not provided.
     if num_examples is None:
