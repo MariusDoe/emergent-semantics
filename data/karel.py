@@ -46,7 +46,7 @@ EOS_TOKEN = "<EOS>"
 
 DEFAULT_TOKENS = [
     "Examples:",
-    "Outputs:",
+    # "Outputs:",
     "Code:",
     "def",
     "run()",
@@ -61,7 +61,7 @@ DEFAULT_TOKENS = [
     # "__endline__",
     # "__ws__",
     PAD_TOKEN,
-    EOS_TOKEN,
+    # EOS_TOKEN,
     "  ",
     " ",
     "\n",
