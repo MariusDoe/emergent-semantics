@@ -201,6 +201,11 @@ def parse_args():
         action="store_true",
         help="Disable the full eval after every epoch.",
     )
+    parser.add_argument(
+        "--finetune",
+        action="store_true",
+        help="Fine-tune, i. e. start with the checkpoint, but start at 0 with everything else.",
+    )
     args = parser.parse_args()
 
     return args
@@ -232,6 +237,7 @@ def main():
     with_tracking = args.with_tracking
     report_to = args.report_to
     no_full_eval = args.no_full_eval
+    finetune = args.finetune
 
     output_dir = config.base_dir
 
@@ -650,7 +656,7 @@ def main():
                 step = int(training_difference.replace("step_", ""))
 
                 # starting new finetune run, so don't load optimizer / scheduler state
-                if step == 0:
+                if step == 0 or finetune:
                     model.load_state_dict(
                         torch.load(f"{checkpoint_path}/pytorch_model.bin")
                     )
@@ -680,7 +686,7 @@ def main():
 
     karel.add_tokens(tokenizer, config.new_actions, model)
 
-    if checkpoint_path is not None:
+    if not finetune and checkpoint_path is not None:
         # Extract `epoch_{i}` or `step_{i}`
         path = os.path.basename(checkpoint_path)
         training_difference = os.path.splitext(path)[0]
