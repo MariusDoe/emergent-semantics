@@ -345,6 +345,8 @@ def main():
         if accelerator.is_main_process and output_dir is not None and not config.debug:
             tokenizer.save_pretrained(output_dir)
     model.resize_token_embeddings(len(tokenizer))
+    tokenizer_without_new_actions  = copy.deepcopy(tokenizer)
+    karel.add_tokens(tokenizer, config.new_actions)
 
     # Load in the raw datasets.
     if "karel" in config.dataset:
@@ -684,6 +686,7 @@ def main():
         else:
             checkpoint_path = None
 
+    tokenizer = tokenizer_without_new_actions
     karel.add_tokens(tokenizer, config.new_actions, model)
 
     if not finetune and checkpoint_path is not None:
