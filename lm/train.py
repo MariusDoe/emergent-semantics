@@ -206,6 +206,11 @@ def parse_args():
         action="store_true",
         help="Fine-tune, i. e. start with the checkpoint, but start at 0 with everything else.",
     )
+    parser.add_argument(
+        "--show_responses",
+        action="store_true",
+        help="Show the responses of the LLM"
+    )
     args = parser.parse_args()
 
     return args
@@ -238,6 +243,7 @@ def main():
     report_to = args.report_to
     no_full_eval = args.no_full_eval
     finetune = args.finetune
+    show_responses = args.show_responses
 
     output_dir = config.base_dir
 
@@ -566,6 +572,7 @@ def main():
             eval_config,
             m,
             tokenizer,
+            show_responses=show_responses,
             batch_size=per_device_eval_batch_size,
             make_semantic_dataset=False,
             generate_trace=False,
