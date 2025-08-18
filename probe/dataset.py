@@ -139,7 +139,7 @@ def load_dataset(
         assert len(move_token) == 1
         move_tokens = [move_token[0]]
 
-    action_tokens = [tokenizer(action)["input_ids"] for action in ACTION_TOKENS]
+    action_tokens = [tokenizer(action)["input_ids"] for action in ACTION_TOKENS + config.new_actions]
     assert all(len(a) == 1 for a in action_tokens)
     action_tokens = [a[0] for a in action_tokens]
     keep_tokens = list(action_tokens)
