@@ -294,26 +294,6 @@ def main():
         if output_dir is not None and not config.debug:
             os.makedirs(output_dir, exist_ok=True)
             accelerator.print(f"{output_dir=}")
-            try:
-                old_args = torch.load(f"{output_dir}/args.pt")
-                if not old_args == args:
-
-                    def _args_to_vars(_args):
-                        return set(
-                            (k, tuple(v) if isinstance(v, list) else v)
-                            for k, v in vars(_args).items()
-                        )
-
-                    set1 = _args_to_vars(args)
-                    set2 = _args_to_vars(old_args)
-                    raise ValueError(
-                        f"Args provided\n"
-                        f"  {set1 - set2}\n"
-                        f"Saved at {output_dir}/args.pt\n"
-                        f"  {set2 - set1}\n"
-                    )
-            except FileNotFoundError:
-                torch.save(args, f"{output_dir}/args.pt")
     del args
 
     accelerator.wait_for_everyone()
