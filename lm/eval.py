@@ -746,9 +746,11 @@ def eval_with_config_and_model(
                 print("spec code")
                 print(spec_code)
                 print("=" * 20)
-                for response, result in zip(responses, results_for_responses):
+                for response, tokens, result in zip(responses, tokens_for_responses, results_for_responses):
                     print("response")
                     print(response)
+                    print("tokens")
+                    print(tokens)
                     print("results")
                     print(result["results"])
                     print("=" * 20)
