@@ -327,19 +327,23 @@ def main():
         tokenizer = model_utils.load_pretrained(
             config, use_fast_tokenizer=not use_slow_tokenizer, load_tokenizer_only=True
         )
+        logger.info(f"Loaded pretrained tokenizer {len(tokenizer)=}")
     except:
         add_conditionals = "nocond" not in config.dataset
         tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, use_fast=not use_slow_tokenizer
         )
+        logger.info(f"Loaded tokenizer from config {len(tokenizer)=}")
         karel.add_special_tokens(
             tokenizer, model=model, add_conditionals=add_conditionals
         )
+        logger.info(f"Added tokens {len(tokenizer)=}")
         if accelerator.is_main_process and output_dir is not None and not config.debug:
             tokenizer.save_pretrained(output_dir)
     model.resize_token_embeddings(len(tokenizer))
     tokenizer_without_new_actions  = copy.deepcopy(tokenizer)
     karel.add_tokens(tokenizer, config.new_actions)
+    logger.info("Loaded tokenizer")
 
     # Load in the raw datasets.
     if "karel" in config.dataset:
@@ -360,7 +364,7 @@ def main():
     else:
         raise ValueError("Dataset {config.dataset} not recognized.")
 
-    # Test tokenizer
+    logger.info("Test tokenizer")
     val_dataset = load_dataset("val", num_examples=config.num_examples)
     sample = val_dataset["train"][0]["spec"]
     tokenizer(sample)
@@ -371,6 +375,7 @@ def main():
         lengths_to_filter=lengths_to_filter,
     )
     raw_datasets["val"] = val_dataset["train"]
+    logger.info("Loaded datasets")
 
     logger.info(
         f"Sample 0 of the raw training set:\n" f"{raw_datasets['train'][0]['spec']}"
@@ -393,6 +398,7 @@ def main():
             load_from_cache_file=not overwrite_cache,
             desc="Running tokenizer on dataset",
         )
+    logger.info("Tokenized datasets")
 
     if block_size is None:
         block_size = tokenizer.model_max_length
@@ -443,6 +449,7 @@ def main():
             load_from_cache_file=not overwrite_cache,
             desc=f"Grouping texts in chunks of {block_size}",
         )
+    logger.info("Chunked datasets")
 
     train_dataset = lm_datasets["train"]
     eval_dataset = lm_datasets["val"]
@@ -513,6 +520,7 @@ def main():
     ) = accelerator.prepare(
         model, optimizer, train_dataloader, eval_dataloader, lr_scheduler
     )
+    logger.info("Prepared accelerator")
 
     # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
     if accelerator.distributed_type == DistributedType.TPU:
@@ -544,6 +552,7 @@ def main():
 
     # Prepare eval datasets
     raw_dataset, state_dataset = load_datasets(config)
+    logger.info("Loaded eval dataset")
 
     eval_config = config.update(
         grammar_decoding=True,
@@ -645,11 +654,12 @@ def main():
 
         for checkpoint_path in checkpoint_paths:
             try:
-                accelerator.print(f"Try resuming from checkpoint: {checkpoint_path}")
+                logger.info(f"Try resuming from checkpoint: {checkpoint_path}")
 
                 path = os.path.basename(checkpoint_path)
                 training_difference = os.path.splitext(path)[0]
                 step = int(training_difference.replace("step_", ""))
+                logger.info(f"{step=} {path=}")
 
                 # starting new finetune run, so don't load optimizer / scheduler state
                 if step == 0 or finetune:
@@ -674,14 +684,17 @@ def main():
 
                 all_results_path = os.path.join(checkpoint_path, "synthesis_train.pth")
                 all_results = torch.load(all_results_path)
+                logger.info(f"Loaded checkpoint {checkpoint_path}")
                 break
             except Exception as e:
-                print(f"Failed to resume from {checkpoint_path}, exception {e}")
+                logger.info(f"Failed to resume from {checkpoint_path}, exception {e}")
         else:
             checkpoint_path = None
 
     tokenizer = tokenizer_without_new_actions
     karel.add_tokens(tokenizer, config.new_actions, model)
+    logger.info(f"Added tokens {len(tokenizer)=}")
+    logger.info(f"Chose checkpoint {checkpoint_path}")
 
     if do_rl:
         def reward_func(**kwargs):
@@ -729,6 +742,7 @@ def main():
             )
             starting_epoch = resume_step // len(train_dataloader)
             resume_step -= starting_epoch * len(train_dataloader)
+    logger.info(f"{starting_epoch=} {resume_step=}")
 
     # update the progress_bar if load from checkpoint
     progress_bar.update(starting_epoch * num_update_steps_per_epoch)
@@ -750,7 +764,7 @@ def main():
                     continue
 
             if not first_step:
-                progress_bar.write(f"First step: {completed_steps}")
+                logger.info(f"First step: {completed_steps}")
                 first_step = True
             with accelerator.accumulate(model):
                 outputs = model(**batch)
@@ -779,7 +793,7 @@ def main():
                         (completed_steps, perplexity, train_loss)
                     )
                     train_losses = []
-                    progress_bar.write(
+                    logger.info(
                         f"step {completed_steps}: perplexity: {perplexity} train_loss: {train_loss}"
                     )
 
@@ -787,7 +801,7 @@ def main():
                     torch.cuda.empty_cache()
                     acc, perplexity, loss = eval(model)
                     all_results["val"].append((completed_steps, perplexity, loss))
-                    progress_bar.write(
+                    logger.info(
                         f"step {completed_steps}: acc: {acc} perplexity: {perplexity} val_loss: {loss}"
                     )
 

@@ -140,6 +140,8 @@ def load_dataset(
         move_tokens = [move_token[0]]
 
     action_tokens = [tokenizer(action)["input_ids"] for action in ACTION_TOKENS + config.new_actions]
+    action_tokens_dict = {action: tokenizer(action)["input_ids"] for action in ACTION_TOKENS + config.new_actions}
+    print(f"{action_tokens_dict=}")
     assert all(len(a) == 1 for a in action_tokens)
     action_tokens = [a[0] for a in action_tokens]
     keep_tokens = list(action_tokens)
@@ -374,6 +376,7 @@ def load_dataset(
                 _keys.append(keys.pop(0))
             else:
                 _keys.append(None)
+        print(f"{code_tokens=} {_keys=} {keys=} {keep_tokens=} {sample['text']=}")
         assert not keys
         keys = _keys
 
