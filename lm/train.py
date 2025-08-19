@@ -23,6 +23,7 @@ from accelerate.utils import set_seed
 # from huggingface_hub import Repository, create_repo
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+from trl import GRPOConfig, GRPOTrainer
 
 import transformers
 from transformers import (
@@ -207,6 +208,11 @@ def parse_args():
         help="Fine-tune, i. e. start with the checkpoint, but start at 0 with everything else.",
     )
     parser.add_argument(
+        "--do_rl",
+        action="store_true",
+        help="Do reinforcement learning with GRPO",
+    )
+    parser.add_argument(
         "--show_responses",
         action="store_true",
         help="Show the responses of the LLM"
@@ -243,6 +249,7 @@ def main():
     report_to = args.report_to
     no_full_eval = args.no_full_eval
     finetune = args.finetune
+    do_rl = args.do_rl
     show_responses = args.show_responses
 
     output_dir = config.base_dir
@@ -695,6 +702,36 @@ def main():
 
     tokenizer = tokenizer_without_new_actions
     karel.add_tokens(tokenizer, config.new_actions, model)
+
+    if do_rl:
+        def reward_func(**kwargs):
+            print(kwargs)
+            assert False
+
+        grpo_config = GRPOConfig(
+            per_device_train_batch_size=per_device_train_batch_size,
+            per_device_eval_batch_size=per_device_eval_batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            num_train_epochs=num_train_epochs,
+            max_steps=max_train_steps,
+            lr_scheduler_type=lr_scheduler_type,
+            warmup_steps=num_warmup_steps,
+            save_steps=checkpointing_steps,
+            seed=seed,
+            temperature=temperature,
+        )
+
+        trainer = GRPOTrainer(
+            model=model,
+            reward_funcs=reward_func,
+            args=grpo_config,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+        )
+        trainer.train()
+
 
     if not finetune and checkpoint_path is not None:
         # Extract `epoch_{i}` or `step_{i}`
