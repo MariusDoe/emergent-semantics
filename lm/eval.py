@@ -729,6 +729,7 @@ def eval_with_config_and_model(
                     spec_examples=spec_examples,
                     generate_trace=generate_trace,
                     mode=mode,
+                    mapping=config.mapping,
                 )
                 for response in responses
             ]

@@ -40,6 +40,12 @@ if __name__ == "__main__":
     data_arg.add_argument(
         "--world_width", type=int, default=8, help="Width of square grid world"
     )
+    data_arg.add_argument(
+        "--mapping",
+        default=[],
+        nargs="*",
+        help="Format a:b - map action a to actually mean b. Can be specified multiple times.",
+    )
     config = data_arg.parse_args()
 
     if config.force_interesting_pushes:
@@ -117,6 +123,7 @@ if __name__ == "__main__":
             stmt_weights=stmt_weights,
             force_action=config.force_action,
             force_interesting_pushes=config.force_interesting_pushes,
+            mapping=config.mapping,
         )
         for code, record, np_record in progs:
             if config.beautify:

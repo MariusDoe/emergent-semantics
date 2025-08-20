@@ -10,6 +10,7 @@ from transformers import PreTrainedTokenizerFast
 
 from datasets import load_dataset
 from data.lib.karel_lib.karel import KarelWithCurlyParser
+from data.lib.karel_lib.karel.utils import map_actions
 from data.utils import stdout_silencing
 
 from probe.alt import semantics_transformer
@@ -716,6 +717,7 @@ def semantic_eval(
     generate_trace=False,
     verbose=False,
     mode="synthesis",
+    mapping=[],
 ):
     if not mode in ["synthesis", "interp"]:
         raise ValueError("semantic_eval not implemented for {mode=}")
@@ -736,6 +738,7 @@ def semantic_eval(
     try:
         pcode = post_process_output(code)
         pcode = pp_to_parseable(pcode)
+        pcode = map_actions(pcode, mapping)
     except:
         pcode = None
 

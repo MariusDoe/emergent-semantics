@@ -77,6 +77,7 @@ class Config:
         self.grammar_decoding = args.grammar_decode
         self.new_actions = args.new_actions
         self.max_train_samples = args.max_train_samples
+        self.mapping = args.mapping
 
         # if self.mode == "synthesis":
         assert not self.grammar_decoding or not self.forced_decoding
@@ -541,6 +542,12 @@ class Config:
             default=None,
             choices=["0", "1", "all", "random"],
             help="Which semantics should be active (must pass --use_alt).",
+        )
+        parser.add_argument(
+            "--mapping",
+            default=[],
+            nargs="*",
+            help="Format a:b - map action a to actually mean b. Can be specified multiple times.",
         )
 
         parser.add_argument(

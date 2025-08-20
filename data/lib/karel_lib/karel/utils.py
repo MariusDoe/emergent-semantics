@@ -106,3 +106,15 @@ def get_rng(rng, seed=123):
     if rng is None:
         rng = np.random.RandomState(seed)
     return rng
+
+
+def map_actions(code, mapping):
+    mapping = [meanings.split(":") for meanings in mapping]
+    assert all(len(meanings) == 2 for meanings in mapping)
+    def temp(index):
+        return f"XXX{index}XXX"
+    for index, (old_meaning, _new_meaning) in enumerate(mapping):
+        code = code.replace(old_meaning, temp(index))
+    for index, (_old_meaning, new_meaning) in enumerate(mapping):
+        code = code.replace(temp(index), new_meaning)
+    return code

@@ -1,5 +1,5 @@
 from karel import KarelWithCurlyConfigurableParser
-from karel.utils import get_rng
+from karel.utils import get_rng, map_actions
 from karel.karel import Karel
 import random
 import copy
@@ -16,6 +16,7 @@ def generate_random_with_distribution(
     cond_weights=None,
     force_action=None,
     force_interesting_pushes=False,
+    mapping=[],
 ):
     """
     Return a list of programs whose lengths follow distribution
@@ -67,6 +68,8 @@ def generate_random_with_distribution(
         return random.choices(prods, weights=weights_dict.values(), k=1)[0]
 
     def execute_token(state, token: str):
+        parens = "()"
+        token = map_actions(token + parens, mapping)[:-len(parens)]
         return getattr(state, token)()
 
     def generate_stmts(length, states):
@@ -203,12 +206,13 @@ def generate_random_with_distribution(
             if not force_action or force_action in body:
                 break
         program = f"def run() {{ {body} }}"
+        mapped_program = map_actions(program, mapping)
         if force_interesting_pushes:
             while len(start_states) < 10:
                 [start_state] = make_states(num_states=1)
                 state = copy.deepcopy(start_state)
                 parser.karel = state
-                parser.run(program)
+                parser.run(mapped_program)
                 if state.num_interesting_pushes > 0:
                     start_states.append(start_state)
                     states.append(state)
@@ -218,7 +222,7 @@ def generate_random_with_distribution(
 
         for idx in range(len(start_states)):
             parser.karel = start_states[idx]
-            parser.run(program)
+            parser.run(mapped_program)
             end_state = parser.karel
             if idx < len(states):
                 assert check_state(states[idx], end_state)
