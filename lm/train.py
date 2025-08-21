@@ -217,6 +217,12 @@ def parse_args():
         action="store_true",
         help="Show the responses of the LLM"
     )
+    parser.add_argument(
+        "--max_fast_eval_samples",
+        type=int,
+        default=None,
+        help="Maximum number of samples during fast eval"
+    )
     args = parser.parse_args()
 
     return args
@@ -251,6 +257,9 @@ def main():
     finetune = args.finetune
     do_rl = args.do_rl
     show_responses = args.show_responses
+    max_fast_eval_samples = args.max_fast_eval_samples
+    if max_fast_eval_samples is None:
+        max_fast_eval_samples = 2 * per_device_eval_batch_size
 
     output_dir = config.base_dir
 
@@ -563,7 +572,7 @@ def main():
     @torch.no_grad()
     def eval(m, fast=True):
         m.eval()
-        max_eval_samples = 2 * per_device_eval_batch_size if fast else len(raw_dataset)
+        max_eval_samples = max_fast_eval_samples if fast else len(raw_dataset)
         _, correct, total = eval_with_config_and_model(
             eval_config,
             m,
