@@ -806,7 +806,7 @@ def main():
                         f"step {completed_steps}: perplexity: {perplexity} train_loss: {train_loss}"
                     )
 
-                if completed_steps % 128 == 1:
+                if completed_steps % 100 == 0:
                     torch.cuda.empty_cache()
                     acc, perplexity, loss = eval(model)
                     all_results["val"].append((completed_steps, perplexity, loss))
