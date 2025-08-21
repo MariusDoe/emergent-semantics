@@ -480,6 +480,12 @@ class Config:
             default=[],
             help="New action tokens to be added to the tokenizer after the checkpoint was loaded."
         )
+        parser.add_argument(
+            "--mapping",
+            default=[],
+            nargs="*",
+            help="Format a:b - map action a to actually mean b. Can be specified multiple times.",
+        )
 
     @staticmethod
     def add_eval_args(parser):
@@ -542,12 +548,6 @@ class Config:
             default=None,
             choices=["0", "1", "all", "random"],
             help="Which semantics should be active (must pass --use_alt).",
-        )
-        parser.add_argument(
-            "--mapping",
-            default=[],
-            nargs="*",
-            help="Format a:b - map action a to actually mean b. Can be specified multiple times.",
         )
 
         parser.add_argument(
