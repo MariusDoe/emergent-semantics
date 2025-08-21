@@ -26,7 +26,7 @@ def load_pretrained(
 ):
     def load_tokenizer():
         tokenizer = AutoTokenizer.from_pretrained(
-            config.train_base_dir, use_fast=use_fast_tokenizer
+            os.path.dirname(config.checkpoint_dir), use_fast=use_fast_tokenizer
         )
         tokenizer.pad_token = "<PAD>"
         tokenizer.padding_side = "right"
