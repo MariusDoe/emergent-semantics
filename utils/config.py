@@ -63,6 +63,7 @@ class Config:
                 setattr(args, k, v)
 
         self.step = args.checkpoint_steps
+        self.checkpoint = args.checkpoint
         self.hidden_state_layer = args.hidden_state_layer
         self.max_eval_samples = args.max_eval_samples
         self.eval_dataset = args.eval_dataset_name
@@ -274,6 +275,8 @@ class Config:
 
     @property
     def checkpoint_dir(self):
+        if self.checkpoint is not None:
+            return self.checkpoint
         if self.step is None:
             raise ValueError("No step provided.")
 
@@ -494,6 +497,12 @@ class Config:
             type=int,
             default=None,
             help="Checkpoint to use in steps. If empty, eval final model.",
+        )
+        parser.add_argument(
+            "--checkpoint",
+            type=str,
+            default=None,
+            help="Checkpoint to use in steps.",
         )
         parser.add_argument(
             "--hidden_state_layer",
