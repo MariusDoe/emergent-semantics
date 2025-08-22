@@ -38,8 +38,9 @@ common_keys = {key for key in runs[0][0] if all(args[key] == runs[0][0][key] for
 distinguishing_args = [{key: value for key, value in args.items() if key not in common_keys} for args, _ in runs]
 
 def get_name(args):
-    del args['output_dir']
-    del args['num_warmup_steps']
+    for key in ['output_dir', 'num_warmup_steps']:
+        if key in args:
+            del args[key]
     return str(args.items())
 
 data = {get_name(args): tuple(map(list, zip(*accuracies))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
