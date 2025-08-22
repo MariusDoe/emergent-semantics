@@ -223,6 +223,12 @@ def parse_args():
         default=None,
         help="Maximum number of samples during fast eval"
     )
+    parser.add_argument(
+        "--eval_steps",
+        type=int,
+        default=100,
+        help="Number of steps after which to run a fast eval"
+    )
     args = parser.parse_args()
 
     return args
@@ -260,6 +266,7 @@ def main():
     max_fast_eval_samples = args.max_fast_eval_samples
     if max_fast_eval_samples is None:
         max_fast_eval_samples = 2 * per_device_eval_batch_size
+    eval_steps = args.eval_steps
 
     output_dir = config.base_dir
 
@@ -806,7 +813,7 @@ def main():
                         f"step {completed_steps}: perplexity: {perplexity} train_loss: {train_loss}"
                     )
 
-                if completed_steps % 100 == 0:
+                if completed_steps % eval_steps == 0:
                     torch.cuda.empty_cache()
                     acc, perplexity, loss = eval(model)
                     all_results["val"].append((completed_steps, perplexity, loss))
