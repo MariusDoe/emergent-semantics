@@ -37,11 +37,30 @@ runs = [parse_file(prefix) for prefix in run_prefixes]
 common_keys = {key for key in runs[0][0] if all(args[key] == runs[0][0][key] for args, _ in runs)}
 distinguishing_args = [{key: value for key, value in args.items() if key not in common_keys} for args, _ in runs]
 
+def remove_prefix(string, prefix):
+    if string.startswith(prefix):
+        return string[len(prefix):]
+    return string
+
+def remove_suffix(string, prefix):
+    if string.endswith(prefix):
+        return string[:-len(prefix)]
+    return string
+
+def format_arg(key, value):
+    if key == "dataset_name":
+        key = "ds"
+        value = remove_prefix(value, "karel_")
+        value = remove_suffix(value, "_uniform_noloops_nocond")
+    if key == "learning_rate":
+        key = "lr"
+    return f"{key}:{value}"
+
 def get_name(args):
     for key in ['output_dir', 'num_warmup_steps']:
         if key in args:
             del args[key]
-    return str(args.items())
+    return " ".join(format_arg(key, value) for key, value in args.items())
 
 data = {get_name(args): tuple(map(list, zip(*accuracies))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
 
