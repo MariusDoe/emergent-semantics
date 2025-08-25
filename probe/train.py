@@ -377,7 +377,6 @@ def train_with_config(
         config = config.update(mlp_layers=layer)
         base_dir = config.base_dir
         results_fn = config.semantic_results_path
-        probe_fn = config.semantic_probe_path
 
         skip = False
         if skip_if_exists and not config.debug and CACHE.check(results_fn):
@@ -399,11 +398,6 @@ def train_with_config(
                 os.remove(results_fn)
             except:
                 pass
-        try:
-            # os.remove(results_fn)
-            os.remove(probe_fn)
-        except OSError:
-            pass
 
     print(f"{layers_to_skip=}")
     for layer in layers_to_skip:
@@ -813,16 +807,19 @@ def train_with_config(
         for layer_idx, layer in enumerate(layers):
             config = config.update(mlp_layers=layer)
             results_fn = config.semantic_results_path
-            # probe_fn = config.semantic_probe_path
 
             torch.save(best_results[layer_idx], results_fn)
             print(f"Wrote eval results to {results_fn}.")
 
             make_meta_results(config, best_results[layer_idx])
 
-            # torch.save(best_models[layer_idx].state_dict(), probe_fn)
-            # print(f"Wrote probe to {probe_fn}.")
-            # print()
+        for task_idx, task_models in enumerate(best_models):
+            for ensemble_idx, ensemble_models in enumerate(task_models):
+                for layer_idx, model in enumerate(ensemble_models):
+                    config = config.update(mlp_layers=layer)
+                    probe_fn = config.semantic_probe_path(task_idx=task_idx, ensemble_idx=ensemble_idx)
+                    torch.save(model.state_dict(), probe_fn)
+                    print(f"Wrote probe to {probe_fn}.")
 
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
 

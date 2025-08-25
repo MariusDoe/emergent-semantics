@@ -362,12 +362,16 @@ class Config:
     def semantic_results_meta_path(self):
         return self._semantic_results_path(meta=True)
 
-    @property
-    def semantic_probe_path(self):
-        fn = self._semantic_fn()
-        if fn:
-            fn = "_" + fn
-        fn = "probe" + fn
+    def semantic_probe_path(self, task_idx=None, ensemble_idx=None):
+        fn = ["probe"]
+        fn.append(self._semantic_fn())
+        if not fn[-1]:
+            fn.pop()
+        if task_idx is not None:
+            fn.append(f"task{task_idx}")
+        if ensemble_idx is not None:
+            fn.append(f"ensemble{ensemble_idx}")
+        fn = "_".join(fn)
         return os.path.join(self.semantic_dir, f"{fn}.bin")
 
     @property
