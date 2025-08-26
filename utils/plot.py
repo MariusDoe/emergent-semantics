@@ -41,6 +41,8 @@ def probe_training():
     step_pattern = re.compile(r"step_(\d+)")
     accuracy_pattern = re.compile(r"(?:final|acc).*\[([\d., ]+)\]")
 
+    task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
+
     def find_accuracies(lines):
         step = None
         for line in lines:
@@ -64,7 +66,7 @@ def probe_training():
             runs[index].append((step, accuracy))
         name = os.path.basename(prefix)
         for index, accuracies in runs.items():
-            yield {"name": name, "index": index}, accuracies
+            yield {"name": name, "task": task_names[index]}, accuracies
 
     return parse_file
 
