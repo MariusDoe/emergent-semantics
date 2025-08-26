@@ -1,6 +1,7 @@
 import sys
 import re
 import ast
+import matplotlib
 import matplotlib.pyplot as plt
 import os
 from argparse import Namespace
@@ -107,11 +108,24 @@ def get_name(args):
             del args[key]
     return " ".join(format_arg(key, value) for key, value in args.items())
 
-data = {get_name(args): tuple(map(list, zip(*accuracies))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
+name_kwargs = {}
+def get_kwargs(args):
+    if "name" in args:
+        name = args["name"]
+        if name in name_kwargs:
+            return name_kwargs[name]
+        marker = list(matplotlib.markers.MarkerStyle.markers.keys())[2 + len(name_kwargs)]
+        linestyle = ['-', '--', '-.', ':'][len(name_kwargs)]
+        kwargs = {"marker": marker, "linestyle": linestyle}
+        name_kwargs[name] = kwargs
+        return kwargs
+    return {"marker": "o"}
+
+data = {get_name(args): (get_kwargs(args), tuple(map(list, zip(*accuracies)))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
 
 plt.figure(figsize=(8, 6))
-for name, (steps, accuracies) in data.items():
-    plt.plot(steps, accuracies, marker="o", label=name)
+for name, (kwargs, (steps, accuracies)) in data.items():
+    plt.plot(steps, accuracies, label=name, **kwargs)
 
 plt.xlabel("Step")
 plt.ylabel("Accuracy")
