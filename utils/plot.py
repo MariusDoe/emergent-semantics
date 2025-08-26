@@ -109,16 +109,27 @@ def get_name(args):
     return " ".join(format_arg(key, value) for key, value in args.items())
 
 name_kwargs = {}
+def get_name_kwargs(name):
+    if name in name_kwargs:
+        return name_kwargs[name]
+    marker = list(matplotlib.markers.MarkerStyle.markers.keys())[2 + len(name_kwargs)]
+    linestyle = ['-', '--', '-.', ':'][len(name_kwargs)]
+    kwargs = {"marker": marker, "linestyle": linestyle}
+    name_kwargs[name] = kwargs
+    return kwargs
+
+task_kwargs = {}
+def get_task_kwargs(task):
+    if task in task_kwargs:
+        return task_kwargs[task]
+    color = list(matplotlib.colors.TABLEAU_COLORS.keys())[len(task_kwargs)]
+    kwargs = {"color": color}
+    task_kwargs[task] = kwargs
+    return kwargs
+
 def get_kwargs(args):
-    if "name" in args:
-        name = args["name"]
-        if name in name_kwargs:
-            return name_kwargs[name]
-        marker = list(matplotlib.markers.MarkerStyle.markers.keys())[2 + len(name_kwargs)]
-        linestyle = ['-', '--', '-.', ':'][len(name_kwargs)]
-        kwargs = {"marker": marker, "linestyle": linestyle}
-        name_kwargs[name] = kwargs
-        return kwargs
+    if mode == "probe":
+        return dict(**get_name_kwargs(args["name"]), **get_task_kwargs(args["task"]))
     return {"marker": "o"}
 
 data = {get_name(args): (get_kwargs(args), tuple(map(list, zip(*accuracies)))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
