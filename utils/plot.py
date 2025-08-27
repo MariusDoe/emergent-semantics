@@ -1,40 +1,62 @@
-import sys
 import re
 import ast
-import matplotlib
-import matplotlib.pyplot as plt
 import os
-from argparse import Namespace
+import matplotlib.pyplot as plt
+from matplotlib.colors import TABLEAU_COLORS
+from matplotlib.artist import Artist
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from argparse import ArgumentParser
 from collections import defaultdict
+from itertools import repeat
+from typing import Any, Callable
 
-mode = sys.argv[1]
-log_file_names = sys.argv[2:]
-run_prefixes = set((os.path.splitext(name)[0] for name in log_file_names))
+Point = tuple[int, float]
+Points = list[Point]
+StrDict = dict[str, Any]
+
+parser = ArgumentParser()
+parser.add_argument("--mode", choices=["model", "probe"], required=True)
+parser.add_argument("--logs", nargs="+", required=True)
+parser.add_argument("--constants", nargs="*", default=[])
+parser.add_argument("--params", nargs="*", default=[])
+parser.add_argument("--out", default="accuracy_plot.png")
+parser.add_argument("--title", default="Accuracy over Steps")
+parser.add_argument("--max_step", type=int)
+args = parser.parse_args()
+
+def skip_step(step: int):
+    if args.max_step is None:
+        return False
+    return step > args.max_step
 
 def model_training():
     accuracy_pattern = re.compile(r"step (\d+): acc: ([0-9.]+)")
 
-    def find_accuracies(lines):
+    def find_points(lines: list[str]):
         for line in lines:
             match = accuracy_pattern.search(line)
             if not match:
                 continue
             step = int(match.group(1))
+            if skip_step(step):
+                continue
             accuracy = float(match.group(2))
             yield step, accuracy
 
-    def parse_file(prefix):
+    def parse_file(name: str, prefix: str):
         with open(prefix + ".out") as out:
-            header = out.readline()
-        args = re.sub(r'^args=Namespace\((.*)\)$', r'{\1}', header)
-        args = re.sub(r'(\w+)=', r'"\1":', args)
+            params_line = out.readline()
+        params_line = re.sub(r'^args=Namespace\((.*)\)$', r'{\1}', params_line)
+        params_line = re.sub(r'(\w+)=', r'"\1":', params_line)
         # Replace <Enum: 'value'> with just 'value'
-        args = re.sub(r"<[^:]+: '([^']+)'>", r"'\1'", args)
-        args = ast.literal_eval(args)
+        params_line = re.sub(r"<[^:]+: '([^']+)'>", r"'\1'", params_line)
+        params: StrDict = ast.literal_eval(params_line)
+        params["name"] = name
         with open(prefix + ".err") as err:
             lines = err.readlines()
-        accuracies = list(find_accuracies(lines))
-        yield args, accuracies
+        points = list(find_points(lines))
+        yield params, points
 
     return parse_file
 
@@ -44,7 +66,7 @@ def probe_training():
 
     task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
 
-    def find_accuracies(lines):
+    def find_points(lines: list[str]):
         step = None
         for line in lines:
             step_match = step_pattern.search(line)
@@ -55,93 +77,158 @@ def probe_training():
             if not accuracy_match:
                 continue
             assert step is not None, "accuracies without step"
+            if skip_step(step):
+                continue
             for index, accuracy in enumerate(accuracy_match.group(1).split(",")):
                 yield index, step, float(accuracy)
             step = None
 
-    def parse_file(prefix):
+    def parse_file(name: str, prefix: str):
         with open(prefix + ".out") as out:
             lines = out.readlines()
-        runs = defaultdict(lambda: [])
-        for index, step, accuracy in find_accuracies(lines):
+        runs: defaultdict[int, Points] = defaultdict(lambda: [])
+        for index, step, accuracy in find_points(lines):
             runs[index].append((step, accuracy))
-        name = os.path.basename(prefix)
-        for index, accuracies in runs.items():
-            yield {"name": name, "task": task_names[index]}, accuracies
+        for index, points in runs.items():
+            params = {"name": name, "task": task_names[index]}
+            yield params, points
 
     return parse_file
 
 parse_file = None
-if mode == "model":
+if args.mode == "model":
     parse_file = model_training()
-if mode == "probe":
+if args.mode == "probe":
     parse_file = probe_training()
 
-assert parse_file is not None, f"unknown {mode=}"
+assert parse_file is not None
 
-runs = [run for prefix in run_prefixes for run in parse_file(prefix)]
-common_keys = {key for key in runs[0][0] if all(args[key] == runs[0][0][key] for args, _ in runs)}
-distinguishing_args = [{key: value for key, value in args.items() if key not in common_keys} for args, _ in runs]
 
-def remove_prefix(string, prefix):
+def transpose(points: Points) -> tuple[list[int], list[float]]:
+    steps, accuracies = map(list, zip(*points))
+    return steps, accuracies
+
+run_prefixes: dict[str, str] = {}
+for log in args.logs:
+    if ":" in log:
+        name, log = log.split(":")
+    else:
+        name = log
+    prefix, _ = os.path.splitext(log)
+    run_prefixes[prefix] = name
+
+runs = [run for prefix, name in run_prefixes.items() for run in parse_file(name, prefix)]
+
+first_params, first_points = runs[0]
+first_steps, _ = transpose(first_points)
+for constant in args.constants:
+    accuracy, *params = constant.split(",")
+    accuracy = float(accuracy)
+    params = {key: value for key, value in (param.split(":") for param in params)}
+    points = list(zip(first_steps, repeat(accuracy)))
+    runs.append((params, points))
+
+def remove_prefix(string: str, prefix: str):
     if string.startswith(prefix):
         return string[len(prefix):]
     return string
 
-def remove_suffix(string, prefix):
+def remove_suffix(string: str, prefix: str):
     if string.endswith(prefix):
         return string[:-len(prefix)]
     return string
 
-def format_arg(key, value):
+def format_param(key: str, value: Any):
     if key == "dataset_name":
         key = "ds"
         value = remove_prefix(value, "karel_")
         value = remove_suffix(value, "_uniform_noloops_nocond")
     if key == "learning_rate":
         key = "lr"
-    return f"{key}:{value}"
+        value = float(value)
+        value = f"{value:.0e}"
+    if key == "mapping":
+        def format_mapping(mapping: str):
+            old, new = (remove_suffix(action, "()") for action in mapping.split(":"))
+            return f"{old}->{new}"
 
-def get_name(args):
-    for key in ['output_dir', 'num_warmup_steps']:
-        if key in args:
-            del args[key]
-    return " ".join(format_arg(key, value) for key, value in args.items())
+        value = ", ".join(format_mapping(mapping) for mapping in value)
+    return f"{key}: {value}"
 
-name_kwargs = {}
-def get_name_kwargs(name):
-    if name in name_kwargs:
-        return name_kwargs[name]
-    marker = list(matplotlib.markers.MarkerStyle.markers.keys())[2 + len(name_kwargs)]
-    linestyle = ['-', '--', '-.', ':'][len(name_kwargs)]
-    kwargs = {"marker": marker, "linestyle": linestyle}
-    name_kwargs[name] = kwargs
+display_params: dict[str, str] = {key: display_key for key, display_key in (arg.split(":") for arg in args.params)}
+
+def without(dict: StrDict, *keys: str):
+    result = dict.copy()
+    for key in keys:
+        if key in result:
+            del result[key]
+    return result
+
+DisplayLegend = Callable[[dict[str, Any], str], Artist]
+
+display: dict[str, tuple[list[StrDict], DisplayLegend]] = {
+    "marker": (
+        [{"marker": marker, "markersize": 4} for marker in ["o", "^", "*", "s", "D", "P"]],
+        lambda kwargs, label: Line2D([0], [0], label=label, color="white", markerfacecolor=kwargs.get("color", "black"), markersize=10, **without(kwargs, "color", "markersize"))),
+    "linestyle": (
+        [{"linestyle": linestyle} for linestyle in ['-', '--', '-.', ':', (0, (1, 5)), (0, (3, 1, 1, 1, 1, 1))]],
+        lambda kwargs, label: Line2D([0], [0], label=label, **{"color": "black", **kwargs})),
+    "color": (
+        [{"color": color} for color in TABLEAU_COLORS.keys()],
+        lambda kwargs, label: Patch(facecolor=kwargs["color"], edgecolor='black', label=label, **without(kwargs, "color"))),
+}
+
+plot_kwargs_by_param: dict[str, dict[str, tuple[StrDict, DisplayLegend]]] = defaultdict(lambda: {})
+
+def get_param_kwargs(key: str, value: Any) -> StrDict:
+    if key not in display_params:
+        return {}
+    plot_kwargs = plot_kwargs_by_param[key]
+    if value in plot_kwargs:
+        kwargs, _ = plot_kwargs[value]
+        return kwargs
+    display_keys = display_params[key].split(",")
+    kwargs: StrDict = {}
+    display_legend = None
+    for display_key in display_keys:
+        display_dicts, current_display_legend = display[display_key]
+        display_dict = display_dicts[len(plot_kwargs) % len(display_dicts)]
+        kwargs.update(**display_dict)
+        if display_legend is None:
+            display_legend = current_display_legend
+    assert display_legend is not None
+    plot_kwargs[value] = (kwargs, display_legend)
     return kwargs
 
-task_kwargs = {}
-def get_task_kwargs(task):
-    if task in task_kwargs:
-        return task_kwargs[task]
-    color = list(matplotlib.colors.TABLEAU_COLORS.keys())[len(task_kwargs)]
-    kwargs = {"color": color}
-    task_kwargs[task] = kwargs
+def get_params_kwargs(params: StrDict):
+    kwargs: StrDict = {}
+    for key, value in params.items():
+        kwargs.update(**get_param_kwargs(key, value))
     return kwargs
-
-def get_kwargs(args):
-    if mode == "probe":
-        return dict(**get_name_kwargs(args["name"]), **get_task_kwargs(args["task"]))
-    return {"marker": "o"}
-
-data = {get_name(args): (get_kwargs(args), tuple(map(list, zip(*accuracies)))) for args, (_, accuracies) in zip(distinguishing_args, runs)}
 
 plt.figure(figsize=(8, 6))
-for name, (kwargs, (steps, accuracies)) in data.items():
-    plt.plot(steps, accuracies, label=name, **kwargs)
+for params, points in runs:
+    if not points:
+        continue
+    kwargs = get_params_kwargs(params)
+    steps, accuracies = transpose(points)
+    plt.plot(steps, accuracies, **kwargs)
 
 plt.xlabel("Step")
 plt.ylabel("Accuracy")
-plt.title("Accuracy over Steps")
-plt.legend()
+plt.title(args.title)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("accuracy_plot.png", dpi=300)
+
+legend_elements: list[Artist] = []
+for key in display_params:
+    plot_kwargs = plot_kwargs_by_param[key]
+    for value in sorted(plot_kwargs.keys()):
+        kwargs, display_legend = plot_kwargs[value]
+        label = format_param(key, value)
+        display_keys, display_value = next(iter(kwargs.items()))
+        legend_element = display_legend(kwargs, label)
+        legend_elements.append(legend_element)
+
+plt.legend(handles=legend_elements, loc="lower right", fontsize="small")
+plt.savefig(args.out, dpi=300)
