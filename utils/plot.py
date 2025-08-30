@@ -117,7 +117,11 @@ for log in args.logs:
     prefix, _ = os.path.splitext(log)
     run_prefixes[prefix] = name
 
-runs = [run for prefix, name in run_prefixes.items() for run in parse_file(name, prefix)]
+def point_sort_key(point: Point):
+    step, _ = point
+    return step
+
+runs = [(params, list(sorted(points, key=point_sort_key))) for prefix, name in run_prefixes.items() for params, points in parse_file(name, prefix)]
 
 first_params, first_points = runs[0]
 first_steps, _ = transpose(first_points)
