@@ -273,9 +273,8 @@ class Config:
         base_dir = os.path.join("outputs", self.output_dir, ds_name, model_dir)
         return base_dir
 
-    @property
-    def checkpoint_dir(self):
-        if self.checkpoint is not None:
+    def _checkpoint_dir(self, use_checkpoint=True):
+        if use_checkpoint and self.checkpoint is not None:
             return self.checkpoint
         if self.step is None:
             raise ValueError("No step provided.")
@@ -285,8 +284,14 @@ class Config:
         return base_dir
 
     @property
+    def checkpoint_dir(self):
+        return self._checkpoint_dir()
+
+    @property
     def base_dir(self):
         if self.step is not None:
+            base_dir = self._checkpoint_dir(False)
+        elif self.checkpoint is not None:
             base_dir = self.checkpoint_dir
         else:
             base_dir = self.train_base_dir
