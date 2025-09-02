@@ -375,6 +375,7 @@ def main():
             alt_active="random",
             mode=config.mode,
             max_samples=config.max_train_samples,
+            include_response=not do_rl,
             **kw,
         )
     else:

@@ -614,6 +614,7 @@ def load_karel(
     mode="synthesis",
     lengths_to_filter=None,
     max_samples=None,
+    include_response=True,
 ):
     raw_dataset = load_karel_raw(split, data_folder=dataset_name)
     if max_samples is not None:
@@ -653,6 +654,7 @@ def load_karel(
             use_alt=use_alt,
             alt_active=alt_active,
             mode=mode,
+            include_response=include_response,
         )
 
     return filtered_dataset.map(
