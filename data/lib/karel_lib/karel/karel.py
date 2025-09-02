@@ -351,6 +351,26 @@ class Karel(object):
         return self.move() and self.move()
 
     @hero_action
+    def move_left(self):
+        '''Move left'''
+        success = True
+        if not self._left_is_clear():
+            success = False
+        else:
+            self.hero.move_left()
+        return success
+
+    @hero_action
+    def move_right(self):
+        '''Move right'''
+        success = True
+        if not self._right_is_clear():
+            success = False
+        else:
+            self.hero.move_right()
+        return success
+
+    @hero_action
     def move_back(self):
         '''Move back'''
         success = True

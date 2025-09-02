@@ -13,6 +13,18 @@ class Hero(object):
             self.position[1] + self.facing[1],
         )
 
+    def move_left(self):
+        self.position = (
+            self.position[0] + self.facing[1],
+            self.position[1] - self.facing[0],
+        )
+
+    def move_right(self):
+        self.position = (
+            self.position[0] - self.facing[1],
+            self.position[1] + self.facing[0],
+        )
+
     def move_back(self):
         self.position = (
             self.position[0] - self.facing[0],

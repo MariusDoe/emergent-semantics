@@ -27,6 +27,8 @@ if __name__ == "__main__":
     data_arg.add_argument("--no_noops", action="store_true")
     data_arg.add_argument("--use_move_twice", action="store_true")
     data_arg.add_argument("--use_move_back", action="store_true")
+    data_arg.add_argument("--use_move_left", action="store_true")
+    data_arg.add_argument("--use_move_right", action="store_true")
     data_arg.add_argument("--use_push_obstacle", action="store_true")
     data_arg.add_argument("--force_interesting_pushes", action="store_true")
     data_arg.add_argument("--force_action")
@@ -55,6 +57,10 @@ if __name__ == "__main__":
         config.use_push_obstacle = True
     if config.force_action == "move_twice":
         config.use_move_twice = True
+    if config.force_action == "move_left":
+        config.use_move_left = True
+    if config.force_action == "move_right":
+        config.use_move_right = True
     if config.force_action == "move_back":
         config.use_move_back = True
 
@@ -72,6 +78,10 @@ if __name__ == "__main__":
     data_dir = os.path.join("data", config.data_dir)
     if config.use_move_twice:
         stmt_weights["move_twice"] = 2
+    if config.use_move_left:
+        stmt_weights["move_left"] = 2
+    if config.use_move_right:
+        stmt_weights["move_right"] = 2
     if config.use_move_back:
         stmt_weights["move_back"] = 2
     if config.use_push_obstacle:
