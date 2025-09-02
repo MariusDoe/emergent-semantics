@@ -23,6 +23,7 @@ parser.add_argument("--params", nargs="*", default=[])
 parser.add_argument("--out", default="accuracy_plot.png")
 parser.add_argument("--title", default="Accuracy over Steps")
 parser.add_argument("--max_step", type=int)
+parser.add_argument("--add_points", nargs="*", default=[])
 args = parser.parse_args()
 
 def skip_step(step: int):
@@ -117,11 +118,21 @@ for log in args.logs:
     prefix, _ = os.path.splitext(log)
     run_prefixes[prefix] = name
 
+runs = [run for prefix, name in run_prefixes.items() for run in parse_file(name, prefix)]
+
+for point in args.add_points:
+    step, accuracy = point.split(":")
+    step = int(step)
+    accuracy = float(accuracy)
+    point = (step, accuracy)
+    for _, points in runs:
+        points.append(point)
+
 def point_sort_key(point: Point):
     step, _ = point
     return step
 
-runs = [(params, list(sorted(points, key=point_sort_key))) for prefix, name in run_prefixes.items() for params, points in parse_file(name, prefix)]
+runs = [(params, list(sorted(points, key=point_sort_key))) for params, points in runs]
 
 first_params, first_points = runs[0]
 first_steps, _ = transpose(first_points)
