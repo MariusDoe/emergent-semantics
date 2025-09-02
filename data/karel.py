@@ -468,19 +468,17 @@ def make_spec(
     parser = KarelWithCurlyParser()
 
     def parser_to_text(p):
-        return _format_state(
-            "\n".join(
-                p.draw(
-                    no_print=True,
-                )
-            )
-        )
+        return "\n".join(p.draw(no_print=True))
+
+    included_inputs = []
 
     def make_inputs():
         texts = []
         for idx, active in enumerate(active_examples):
             text = f"Input{idx}\n"
-            text += _format_state(example[f"input{idx}"])
+            input = example[f"input{idx}"]
+            text += _format_state(input)
+            included_inputs.append(input)
             texts.append(text)
         return texts
 
@@ -495,7 +493,6 @@ def make_spec(
             "########\n"
             "########"
         )
-        inactive_state = _format_state(inactive_state)
     elif inactive_mode == "space":
         inactive_state = (
             "########\n"
@@ -507,7 +504,6 @@ def make_spec(
             "#......#\n"
             "########"
         )
-        inactive_state = _format_state(inactive_state)
 
     def rerun_code(orig_state, code):
         # TODO: Hack, ideally load state dataset directly
@@ -518,6 +514,8 @@ def make_spec(
         assert old_state == orig_state, (old_state, orig_state)
         parser.run(code)
         return parser_to_text(parser)
+
+    included_outputs = []
 
     def make_outputs():
         texts = []
@@ -531,23 +529,25 @@ def make_spec(
         for idx, active in enumerate(active_examples):
             text = f"Output{idx}\n"
             if active:
-                text += _format_state(example[f"output{idx}"])
+                output = example[f"output{idx}"]
             else:
                 if inactive_mode == "permute":
                     inactive_idx = inactive.pop(0)
-                    text += _format_state(example[f"output{inactive_idx}"])
+                    output = example[f"output{inactive_idx}"]
                 elif inactive_mode in ["wall", "space"]:
-                    text += inactive_state
+                    output = inactive_state
                 elif inactive_mode == "input":
-                    text += _format_state(example[f"input{idx}"])
+                    output = example[f"input{idx}"]
                 elif inactive_mode == "random":
                     parser.new_game(world_size=WORLD_SIZE)
-                    text += parser_to_text(parser)
+                    output = parser_to_text(parser)
                 elif inactive_mode == "alt":
                     orig_state = example[f"input{idx}"]
-                    text += rerun_code(orig_state, alt_code)
+                    output = rerun_code(orig_state, alt_code)
                 else:
                     assert False, f"{inactive_mode=} not supported in make_spec."
+            text += _format_state(output)
+            included_outputs.append(output)
             texts.append(text)
         return texts
 
@@ -596,7 +596,12 @@ def make_spec(
         assert False, f"Mode must be one of synthesis or interp, but got {mode=}"
 
     text = make_prompt() + "\n" + make_response()
-    return {"spec": text, "active": active_examples}
+    return {
+        "spec": text,
+        "active": active_examples,
+        "inputs": included_inputs,
+        "outputs": included_outputs,
+    }
 
 
 def load_karel(

@@ -43,6 +43,7 @@ from transformers.utils.versions import require_version
 from lm.eval import eval_with_config_and_model, load_datasets
 from data.karel import load_karel
 from data import karel
+from data.lib.karel_lib.karel import KarelWithCurlyParser
 from utils.config import Config
 import utils.model as model_utils
 
@@ -726,9 +727,22 @@ def main():
         train_dataset = adapt_dataset(train_dataset)
         eval_dataset = adapt_dataset(eval_dataset)
 
-        def reward_func(**kwargs):
-            print(kwargs)
-            assert False
+        parser = KarelWithCurlyParser()
+
+        def single_reward(code, inputs, outputs):
+            reward = 0
+            for input, correct_output in zip(inputs, outputs):
+                parser.new_game(world_string=input.split("\n"))
+                try:
+                    parser.run(code)
+                    actual_output = "\n".join(parser.draw(no_print=True))
+                    reward += actual_output == correct_output
+                except:
+                    reward -= 100
+            return float(reward)
+
+        def reward_func(completions, inputs, outputs, **kwargs):
+            return [single_reward(completion, completion_inputs, completion_outputs) for completion, completion_inputs, completion_outputs in zip(completions, inputs, outputs)]
 
         grpo_config = GRPOConfig(
             per_device_train_batch_size=per_device_train_batch_size,
