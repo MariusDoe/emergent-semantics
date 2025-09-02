@@ -31,6 +31,7 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    ProcessorMixin,
     SchedulerType,
     default_data_collator,
     get_scheduler,
@@ -401,19 +402,20 @@ def main():
     column_names = raw_datasets["train"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
 
-    def tokenize_function(examples):
-        return tokenizer(examples[text_column_name])
+    if not do_rl:
+        def tokenize_function(examples):
+            return tokenizer(examples[text_column_name])
 
-    with accelerator.main_process_first():
-        tokenized_datasets = raw_datasets.map(
-            tokenize_function,
-            batched=True,
-            num_proc=preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not overwrite_cache,
-            desc="Running tokenizer on dataset",
-        )
-    logger.info("Tokenized datasets")
+        with accelerator.main_process_first():
+            tokenized_datasets = raw_datasets.map(
+                tokenize_function,
+                batched=True,
+                num_proc=preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not overwrite_cache,
+                desc="Running tokenizer on dataset",
+            )
+        logger.info("Tokenized datasets")
 
     if block_size is None:
         block_size = tokenizer.model_max_length
@@ -456,15 +458,18 @@ def main():
     # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
     # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
 
-    with accelerator.main_process_first():
-        lm_datasets = tokenized_datasets.map(
-            group_texts,
-            batched=True,
-            num_proc=preprocessing_num_workers,
-            load_from_cache_file=not overwrite_cache,
-            desc=f"Grouping texts in chunks of {block_size}",
-        )
-    logger.info("Chunked datasets")
+    if do_rl:
+        lm_datasets = raw_datasets
+    else:
+        with accelerator.main_process_first():
+            lm_datasets = tokenized_datasets.map(
+                group_texts,
+                batched=True,
+                num_proc=preprocessing_num_workers,
+                load_from_cache_file=not overwrite_cache,
+                desc=f"Grouping texts in chunks of {block_size}",
+            )
+        logger.info("Chunked datasets")
 
     train_dataset = lm_datasets["train"]
     eval_dataset = lm_datasets["val"]
@@ -714,6 +719,12 @@ def main():
     if do_rl:
         from trl import GRPOConfig, GRPOTrainer
 
+        def adapt_dataset(dataset):
+            return dataset.rename_column(text_column_name, "prompt")
+
+        train_dataset = adapt_dataset(train_dataset)
+        eval_dataset = adapt_dataset(eval_dataset)
+
         def reward_func(**kwargs):
             print(kwargs)
             assert False
@@ -738,6 +749,7 @@ def main():
             args=grpo_config,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
+            processing_class=tokenizer,
         )
         trainer.train()
         return
