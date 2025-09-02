@@ -740,6 +740,7 @@ def main():
             eval_dataset=eval_dataset,
         )
         trainer.train()
+        return
 
 
     if not finetune and checkpoint_path is not None:
