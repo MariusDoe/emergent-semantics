@@ -23,7 +23,6 @@ from accelerate.utils import set_seed
 # from huggingface_hub import Repository, create_repo
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-#from trl import GRPOConfig, GRPOTrainer
 
 import transformers
 from transformers import (
@@ -713,6 +712,8 @@ def main():
     logger.info(f"Chose checkpoint {checkpoint_path}")
 
     if do_rl:
+        from trl import GRPOConfig, GRPOTrainer
+
         def reward_func(**kwargs):
             print(kwargs)
             assert False
