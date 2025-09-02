@@ -351,6 +351,16 @@ class Karel(object):
         return self.move() and self.move()
 
     @hero_action
+    def move_back(self):
+        '''Move back'''
+        success = True
+        if not self._back_is_clear():
+            success = False
+        else:
+            self.hero.move_back()
+        return success
+
+    @hero_action
     def push_obstacle(self):
         '''Push an obstacle'''
         if not self.can_push():
@@ -407,6 +417,14 @@ class Karel(object):
 
     def _front_is_clear(self):
         return self.char_in_front() == "."
+
+    def char_in_back(self):
+        next_x = self.hero.position[0] - self.hero.facing[0]
+        next_y = self.hero.position[1] - self.hero.facing[1]
+        return self.world[next_y][next_x]
+
+    def _back_is_clear(self):
+        return self.char_in_back() == "."
 
     def _is_in_bounds(self, x, y):
         height = len(self.world)

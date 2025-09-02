@@ -33,6 +33,7 @@ class KarelForSynthesisParser(Parser):
         "NOT",
         "MOVE",
         "MOVE_TWICE",
+        "MOVE_BACK",
         "TURN_RIGHT",
         "TURN_LEFT",
         "PICK_MARKER",
@@ -85,6 +86,7 @@ class KarelForSynthesisParser(Parser):
 
     t_MOVE = "move"
     t_MOVE_TWICE = "moveTwice"
+    t_MOVE_BACK = "moveBack"
     t_TURN_RIGHT = "turnRight"
     t_TURN_LEFT = "turnLeft"
     t_PICK_MARKER = "pickMarker"
@@ -94,6 +96,7 @@ class KarelForSynthesisParser(Parser):
     action_functions = [
         t_MOVE,
         t_MOVE_TWICE,
+        t_MOVE_BACK,
         t_TURN_RIGHT,
         t_TURN_LEFT,
         t_PICK_MARKER,
@@ -356,6 +359,7 @@ class KarelForSynthesisParser(Parser):
     def p_action(self, p):
         """action : MOVE
         | MOVE_TWICE
+        | MOVE_BACK
         | TURN_RIGHT
         | TURN_LEFT
         | PICK_MARKER
