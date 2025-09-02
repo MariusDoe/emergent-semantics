@@ -45,23 +45,23 @@ class KarelForSynthesisParser(Parser):
 
     t_ignore = " \t\n"
 
-    t_M_LBRACE = "m\("
-    t_M_RBRACE = "m\)"
+    t_M_LBRACE = r"m\("
+    t_M_RBRACE = r"m\)"
 
-    t_C_LBRACE = "c\("
-    t_C_RBRACE = "c\)"
+    t_C_LBRACE = r"c\("
+    t_C_RBRACE = r"c\)"
 
-    t_R_LBRACE = "r\("
-    t_R_RBRACE = "r\)"
+    t_R_LBRACE = r"r\("
+    t_R_RBRACE = r"r\)"
 
-    t_W_LBRACE = "w\("
-    t_W_RBRACE = "w\)"
+    t_W_LBRACE = r"w\("
+    t_W_RBRACE = r"w\)"
 
-    t_I_LBRACE = "i\("
-    t_I_RBRACE = "i\)"
+    t_I_LBRACE = r"i\("
+    t_I_RBRACE = r"i\)"
 
-    t_E_LBRACE = "e\("
-    t_E_RBRACE = "e\)"
+    t_E_LBRACE = r"e\("
+    t_E_RBRACE = r"e\)"
 
     t_DEF = "DEF"
     t_RUN = "run"

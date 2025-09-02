@@ -41,10 +41,10 @@ class KarelWithCurlyParser(Parser):
     ]
 
     t_ignore = " \t\n"
-    t_LPAREN = "\("
-    t_RPAREN = "\)"
-    t_LBRACE = "\{"
-    t_RBRACE = "\}"
+    t_LPAREN = r"\("
+    t_RPAREN = r"\)"
+    t_LBRACE = r"\{"
+    t_RBRACE = r"\}"
     t_SEMI = ";"
 
     t_DEF = "def"
