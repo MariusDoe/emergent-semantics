@@ -729,7 +729,6 @@ def main():
             warmup_steps=num_warmup_steps,
             save_steps=checkpointing_steps,
             seed=seed,
-            temperature=temperature,
         )
 
         trainer = GRPOTrainer(
