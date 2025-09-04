@@ -24,6 +24,8 @@ parser.add_argument("--out", default="accuracy_plot.png")
 parser.add_argument("--title", default="Accuracy over Steps")
 parser.add_argument("--max_step", type=int)
 parser.add_argument("--add_points", nargs="*", default=[])
+parser.add_argument("--show_only", nargs="*", default=[])
+parser.add_argument("--remap_steps", nargs="*", default=[])
 args = parser.parse_args()
 
 def skip_step(step: int):
@@ -45,15 +47,15 @@ def model_training():
             accuracy = float(match.group(2))
             yield step, accuracy
 
-    def parse_file(name: str, prefix: str):
+    def parse_file(prefix: str, params: StrDict):
         with open(prefix + ".out") as out:
-            params_line = out.readline()
-        params_line = re.sub(r'^args=Namespace\((.*)\)$', r'{\1}', params_line)
-        params_line = re.sub(r'(\w+)=', r'"\1":', params_line)
+            args_params_line = out.readline()
+        args_params_line = re.sub(r'^args=Namespace\((.*)\)$', r'{\1}', args_params_line)
+        args_params_line = re.sub(r'(\w+)=', r'"\1":', args_params_line)
         # Replace <Enum: 'value'> with just 'value'
-        params_line = re.sub(r"<[^:]+: '([^']+)'>", r"'\1'", params_line)
-        params: StrDict = ast.literal_eval(params_line)
-        params["name"] = name
+        args_params_line = re.sub(r"<[^:]+: '([^']+)'>", r"'\1'", args_params_line)
+        args_params: StrDict = ast.literal_eval(args_params_line)
+        params.update(args_params)
         with open(prefix + ".err") as err:
             lines = err.readlines()
         points = list(find_points(lines))
@@ -61,15 +63,27 @@ def model_training():
 
     return parse_file
 
+class hashabledict(dict):
+    def __hash__(self):
+        return hash(tuple(sorted(self.items())))
+
 def probe_training():
-    step_pattern = re.compile(r"step_(\d+)")
+    step_pattern = re.compile(r"(?:step_|checkpoint\s+)(\d+)")
     accuracy_pattern = re.compile(r"(?:final|acc).*\[([\d., ]+)\]")
 
     task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
 
     def find_points(lines: list[str]):
+        params = hashabledict()
         step = None
         for line in lines:
+            for phrase, name in [
+                ("eval frozen probe", "frozen"),
+                ("training probe for checkpoint", "from_scratch"),
+                ("training probe on base model", "base_model")
+            ]:
+                if phrase in line:
+                    params["name"] = name
             step_match = step_pattern.search(line)
             if step_match:
                 step = int(step_match.group(1))
@@ -81,18 +95,19 @@ def probe_training():
             if skip_step(step):
                 continue
             for index, accuracy in enumerate(accuracy_match.group(1).split(",")):
-                yield index, step, float(accuracy)
+                point_params = hashabledict(params)
+                point_params["task"] = task_names[index]
+                yield point_params, step, float(accuracy)
             step = None
 
-    def parse_file(name: str, prefix: str):
+    def parse_file(prefix: str, params: StrDict):
         with open(prefix + ".out") as out:
             lines = out.readlines()
-        runs: defaultdict[int, Points] = defaultdict(lambda: [])
-        for index, step, accuracy in find_points(lines):
-            runs[index].append((step, accuracy))
-        for index, points in runs.items():
-            params = {"name": name, "task": task_names[index]}
-            yield params, points
+        runs: defaultdict[hashabledict, Points] = defaultdict(lambda: [])
+        for point_params, step, accuracy in find_points(lines):
+            runs[point_params].append((step, accuracy))
+        for task_params, points in runs.items():
+            yield {**params, **task_params}, points
 
     return parse_file
 
@@ -109,16 +124,21 @@ def transpose(points: Points) -> tuple[list[int], list[float]]:
     steps, accuracies = map(list, zip(*points))
     return steps, accuracies
 
-run_prefixes: dict[str, str] = {}
+run_prefixes: dict[str, StrDict] = {}
+current_params = {}
 for log in args.logs:
     if ":" in log:
-        name, log = log.split(":")
+        key, value = log.split(":")
+        try:
+            value = ast.literal_eval(value)
+        except:
+            pass
+        current_params[key] = value
     else:
-        name = log
-    prefix, _ = os.path.splitext(log)
-    run_prefixes[prefix] = name
+        prefix, _ = os.path.splitext(log)
+        run_prefixes[prefix] = current_params.copy()
 
-runs = [run for prefix, name in run_prefixes.items() for run in parse_file(name, prefix)]
+runs = [run for prefix, params in run_prefixes.items() for run in parse_file(prefix, params)]
 
 for point in args.add_points:
     step, accuracy = point.split(":")
@@ -134,14 +154,32 @@ def point_sort_key(point: Point):
 
 runs = [(params, list(sorted(points, key=point_sort_key))) for params, points in runs]
 
-first_params, first_points = runs[0]
-first_steps, _ = transpose(first_points)
 for constant in args.constants:
     accuracy, *params = constant.split(",")
     accuracy = float(accuracy)
     params = {key: value for key, value in (param.split(":") for param in params)}
-    points = list(zip(first_steps, repeat(accuracy)))
+    points = [(0, accuracy)]
     runs.append((params, points))
+
+def filter_run(run):
+    params, _ = run
+    for show in args.show_only:
+        key, value = show.split(":")
+        if key in params and params[key] == value:
+            return True
+    return False
+
+runs = [run for run in runs if filter_run(run)]
+
+remap_steps = {old: new for steps in args.remap_steps for old, new in [tuple(int(step) for step in steps.split(":"))]}
+runs = [(params, [(remap_steps.get(step, step), accuracy) for step, accuracy in points]) for params, points in runs]
+
+max_step = max(step for _, points in runs for step, _ in points)
+for _, points in runs:
+    if len(points) == 1:
+        [(_, accuracy)] = points
+        points.append((max_step, accuracy))
+
 
 def remove_prefix(string: str, prefix: str):
     if string.startswith(prefix):
@@ -208,7 +246,7 @@ def get_param_kwargs(key: str, value: Any) -> StrDict:
     for display_key in display_keys:
         display_dicts, current_display_legend = display[display_key]
         display_dict = display_dicts[len(plot_kwargs) % len(display_dicts)]
-        kwargs.update(**display_dict)
+        kwargs.update(display_dict)
         if display_legend is None:
             display_legend = current_display_legend
     assert display_legend is not None
@@ -218,7 +256,7 @@ def get_param_kwargs(key: str, value: Any) -> StrDict:
 def get_params_kwargs(params: StrDict):
     kwargs: StrDict = {}
     for key, value in params.items():
-        kwargs.update(**get_param_kwargs(key, value))
+        kwargs.update(get_param_kwargs(key, value))
     return kwargs
 
 plt.figure(figsize=(8, 6))
