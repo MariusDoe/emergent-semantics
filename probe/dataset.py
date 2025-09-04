@@ -76,18 +76,18 @@ def load_dataset(
     hidden_state_layer = config.hidden_state_layer
     ds = CACHE.load(ds_path, max_length=max_samples)
     if ds is not None:
-        hidden_state_layer = None
+        loaded_hidden_state_layer = hidden_state_layer
         alt_ds_path = config.alt_semantic_ds_path
-
-    elif config.hidden_state_layer is not None:
-        ds_config = config.update(hidden_state_layer="full")
+    else:
+        loaded_hidden_state_layer = "full"
+        ds_config = config.update(hidden_state_layer=loaded_hidden_state_layer)
         ds_path = ds_config.semantic_ds_path
         print(f"Last load failed, loading semantic eval dataset from `{ds_path}`.")
 
         ds = CACHE.load(ds_path, max_length=max_samples)
         alt_ds_path = ds_config.alt_semantic_ds_path
 
-    assert ds is not None
+    assert ds is not None, "Failed to load semantic dataset"
 
     if config.alt_idx is not None:
         if not "nocond" in dataset or not "noloops" in dataset:
@@ -365,10 +365,15 @@ def load_dataset(
         # code_tokens = new_code_tokens
 
         traj = list(zip_equal(sample["hidden_states"], code_tokens))
-        if hidden_state_layer is not None:
-            get_layer = lambda x: x[hidden_state_layer]
-        else:
+        if hidden_state_layer == loaded_hidden_state_layer:
             get_layer = lambda x: x
+        elif loaded_hidden_state_layer == "full":
+            if hidden_state_layer == "mean":
+                get_layer = lambda x: torch.mean(x, dim=0)
+            else:
+                get_layer = lambda x: x[int(hidden_state_layer)]
+        else:
+            assert False, f"Cannot extract {hidden_state_layer=} from {loaded_hidden_state_layer=}"
 
         _keys = []
         for _, t in traj:

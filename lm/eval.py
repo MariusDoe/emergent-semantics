@@ -849,7 +849,7 @@ def eval_with_config_and_model(
                         else:
                             code_tokens, code_hs = prompt_tokens, prompt_hs
 
-                        if config.hidden_state_layer is None:
+                        if config.hidden_state_layer == "mean":
                             code_hs = [torch.mean(h, dim=0) for h in code_hs]
                         elif config.hidden_state_layer != "full":
                             hsl = int(config.hidden_state_layer)

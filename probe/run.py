@@ -159,7 +159,13 @@ def main():
     dropout_p = None
     
     filter_lengths = [config.filter_lengths]
-    hidden_state_layers = [hidden_state_layer]
+    if hidden_state_layer == "full":
+        hidden_state_layers = list(range(NUM_LAYERS))
+        hidden_state_layers.append("mean")
+    elif hidden_state_layer == "mean":
+        hidden_state_layers = [hidden_state_layer]
+    else:
+        hidden_state_layers = [int(hidden_state_layer)]
     seeds = [0, 1, 2, 3, 4]
 
     if eval_mode == "intervention":
@@ -202,15 +208,6 @@ def main():
         eval_num_active_examples=eval_num_active_examples,
         eval_alt_spec=eval_alt_spec,
     )
-
-    if hidden_state_layers is None:
-        if hidden_state_layer == "full":
-            hidden_state_layers = list(range(NUM_LAYERS))
-            hidden_state_layers.append(None)
-        elif hidden_state_layer is None:
-            hidden_state_layers = [None]
-        else:
-            hidden_state_layers = [int(hidden_state_layer)]
 
     def make_semantic_ds(config):
         for split in ["test", "train", "val"]:

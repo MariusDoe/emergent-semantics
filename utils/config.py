@@ -147,7 +147,7 @@ class Config:
 
     def _semantic_fn(self):
         fn = []
-        if self.hidden_state_layer is not None:
+        if self.hidden_state_layer != "mean":
             fn.append(f"hs{self.hidden_state_layer}")
         if self.alt_idx is not None:
             fn.append(f"alt{self.alt_idx}")
@@ -189,7 +189,7 @@ class Config:
 
     def _data_fn(self, alt=False):
         fn = ["data"]
-        if self.hidden_state_layer is not None:
+        if self.hidden_state_layer != "mean":
             fn.append(f"hs{self.hidden_state_layer}")
         if alt and self.alt_idx is not None:
             fn.append(f"alt{self.alt_idx}")
@@ -516,8 +516,8 @@ class Config:
         parser.add_argument(
             "--hidden_state_layer",
             type=str,
-            default=None,
-            help="Which hidden state to use. Defaults to None (mean reduction across layers). full runs all hidden states. Otherwise, pass 0-21 to pick a specific hidden state.",
+            default="mean",
+            help="Which hidden state to use. Defaults to mean (mean reduction across layers). full runs all hidden states. Otherwise, pass 0-21 to pick a specific hidden state.",
         )
         parser.add_argument(
             "--max_eval_samples",
