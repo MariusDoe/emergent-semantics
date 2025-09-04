@@ -96,6 +96,11 @@ def parse_args():
         action="store_true",
         help="Show the responses of the LLM"
     )
+    parser.add_argument(
+        "--skip_if_exists",
+        action="store_true",
+        help="Skip if dataset already exists.",
+    )
     args = parser.parse_args()
 
     return args
@@ -116,6 +121,7 @@ def eval():
     temperature = args.temperature
     resume = args.resume
     show_responses = args.show_responses
+    skip_if_exists = args.skip_if_exists
 
     return eval_with_config(
         config,
@@ -127,6 +133,7 @@ def eval():
         temperature,
         resume,
         show_responses=show_responses,
+        skip_if_exists=skip_if_exists,
     )
 
 
@@ -216,6 +223,7 @@ def eval_with_config(
     temperature,
     resume,
     show_responses=False,
+    skip_if_exists=False,
 ):
     model, tokenizer = model_utils.load_pretrained(
         config, load_in_8bit=False, use_fast_tokenizer=True, add_new_actions=True
@@ -233,6 +241,7 @@ def eval_with_config(
         temperature,
         resume,
         show_responses=show_responses,
+        skip_if_exists=skip_if_exists,
     )
 
 
@@ -283,6 +292,7 @@ def eval_with_config_and_model(
     raw_dataset=None,
     state_dataset=None,
     save_results=True,
+    skip_if_exists=False,
 ):
     forced_decoding = config.forced_decoding
     grammar_decoding = config.grammar_decoding
@@ -302,6 +312,9 @@ def eval_with_config_and_model(
 
     if not save_results and make_semantic_dataset:
         raise ValueError("Not saving results but also asked to make semantic dataset.")
+
+    if skip_if_exists and not make_semantic_dataset:
+        raise ValueError("skip_if_exists and wait_until_exists are only allowed with make_semantic_dataset")
 
     if max_length is None:
         if mode == "interp":
@@ -344,6 +357,11 @@ def eval_with_config_and_model(
         os.makedirs(semantic_ds_dir, exist_ok=True)
 
         semantic_ds_path = config.semantic_ds_path
+
+        if skip_if_exists and CACHE.check(semantic_ds_path):
+            print(f"Skipping making of semantic dataset at {semantic_ds_path}")
+            return
+
         print(f"Making semantic dataset at {semantic_ds_path}")
 
     semantic_eval_ds = []
