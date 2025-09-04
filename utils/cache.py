@@ -4,10 +4,7 @@ import datetime
 import torch
 
 
-YEAR = 2024
-MONTH = 3
-DAY = 7
-
+DATE = datetime.datetime(2024, 3, 7, tzinfo=datetime.timezone.utc)
 
 class Cache:
     def __init__(self, verbose=True):
@@ -36,17 +33,13 @@ class Cache:
             self._print(f"Count not find {path}.")
             return False
 
-        if check_day and (
-            recency.year < YEAR or recency.month < MONTH or recency.day < DAY
-        ):
+        if check_day and recency < DATE:
             self._print(
-                f"Found {path} but file is stale: "
-                f"{(recency.year, recency.month, recency.day)} vs "
-                f"{(YEAR, MONTH, DAY)}."
+                f"Found {path} but file is stale: {recency} vs {DATE}."
             )
             return False
-        if check_year and recency.year < YEAR:
-            self._print(f"Found {path} but file is stale: {recency.year} vs {YEAR}.")
+        if check_year and recency.year < DATE.year:
+            self._print(f"Found {path} but file is stale: {recency.year} vs {DATE.year}.")
             return False
         return True
 
