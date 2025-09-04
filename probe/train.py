@@ -380,10 +380,10 @@ def train_with_config(
 
         skip = False
         if skip_if_exists and not config.debug and CACHE.check(results_fn):
+            res = torch.load(results_fn, map_location="cpu")
             meta_results_fn = config.semantic_results_meta_path
             if not CACHE.check(meta_results_fn):
                 try:
-                    res = torch.load(results_fn, map_location="cpu")
                     make_meta_results(config, res)
                     skip = True
                 except:
@@ -393,6 +393,16 @@ def train_with_config(
         if skip:
             layers_to_skip.append(layer)
             print(f"{results_fn} already exists, skipping mlp_layers={layer}.")
+            final_acc = []
+            for results in res:
+                correct = results["correct"]
+                total = results["total"]
+                if total:
+                    acc = correct / total * 100
+                    final_acc.append(acc)
+                else:
+                    final_acc.append("n/a")
+            print(f"At final eval: {final_acc}")
         else:
             try:
                 os.remove(results_fn)
