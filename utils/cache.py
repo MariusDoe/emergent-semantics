@@ -30,7 +30,7 @@ class Cache:
             return None
         return mtime
 
-    def check(self, path, check_day=True, check_year=True):
+    def _check(self, path, check_day=True, check_year=True):
         recency = self._file_recency(path)
         if recency is None:
             self._print(f"Count not find {path}.")
@@ -50,8 +50,11 @@ class Cache:
             return False
         return True
 
+    def check(self, path):
+        return self._check(path) or self._check(f"{path}-000")
+
     def _load_file(self, path, check_recency=True):
-        if not self.check(path, check_day=False, check_year=check_recency):
+        if not self._check(path, check_day=False, check_year=check_recency):
             return None
 
         try:
