@@ -26,6 +26,7 @@ def parse_args():
         default=1024,
         help="Batch size (per device) for the evaluation dataloader.",
     )
+    parser.add_argument("--probe_split")
     args = parser.parse_args()
     return args
 
@@ -72,6 +73,7 @@ def main():
         dataset=args.probe_dataset_name,
         output_dir=args.probe_output_dir,
         step=args.probe_checkpoint_steps,
+        split=args.probe_split,
     )
 
     def load_model(task_idx, ensemble_idx, num_class, mlp_layers):
