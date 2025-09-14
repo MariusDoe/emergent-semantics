@@ -70,10 +70,10 @@ def main():
     dropout_p = 0.2 # from defaults in train_with_config
 
     model_config = dataset_config.update(
-        dataset=args.probe_dataset_name,
-        output_dir=args.probe_output_dir,
-        step=args.probe_checkpoint_steps,
-        split=args.probe_split,
+        dataset=args.probe_dataset_name or args.dataset_name,
+        output_dir=args.probe_output_dir or args.output_dir,
+        step=args.probe_checkpoint_steps or args.checkpoint_steps,
+        split=args.probe_split or args.split,
     )
 
     def load_model(task_idx, ensemble_idx, num_class, mlp_layers):
