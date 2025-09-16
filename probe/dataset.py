@@ -381,7 +381,6 @@ def load_dataset(
                 _keys.append(keys.pop(0))
             else:
                 _keys.append(None)
-        print(f"{code_tokens=} {_keys=} {keys=} {keep_tokens=} {sample['text']=}")
         assert not keys
         keys = _keys
 
