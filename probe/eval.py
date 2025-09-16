@@ -27,6 +27,7 @@ def parse_args():
         help="Batch size (per device) for the evaluation dataloader.",
     )
     parser.add_argument("--probe_split")
+    parser.add_argument("--print_label_frequencies", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -59,6 +60,20 @@ def main():
         filter_inactive=dataset_config.eval_alt_active in ["0", "1"],
         single_label=not dataset_config.all_labels,
     )
+    if args.print_label_frequencies:
+        from collections import Counter, defaultdict
+        task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
+        buckets = defaultdict(lambda: Counter())
+        for labels in dataset.labels:
+            for task, label in zip(task_names, labels):
+                value = label[0].tolist()
+                value = value[0] if len(value) == 1 else tuple(value)
+                buckets[task][value] += 1
+        for task, bucket in buckets.items():
+            print(task)
+            for value, count in bucket.most_common():
+                print(value, count / len(dataset.labels) * 100.0)
+        return
     dataloader = DataLoader(
         dataset,
         shuffle=False,
@@ -101,7 +116,7 @@ def main():
             for mlp_layers in layers]
             for ensemble_idx, num_class in enumerate(num_classes)]
             for task_idx, num_classes in enumerate(dataset.num_classes)]
-    layer_results = eval_ensemble(ensemble, dataloader)
+    layer_results = eval_ensemble(ensemble, dataloader, print_results=False)
 
     for layer_idx, task_results in enumerate(layer_results):
         accs = []
