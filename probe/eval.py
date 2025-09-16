@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--probe_split")
     parser.add_argument("--print_label_frequencies", action="store_true")
     parser.add_argument("--print_results", action="store_true")
+    parser.add_argument("--split_by_program_correctness", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -117,19 +118,33 @@ def main():
             for mlp_layers in layers]
             for ensemble_idx, num_class in enumerate(num_classes)]
             for task_idx, num_classes in enumerate(dataset.num_classes)]
-    layer_results = eval_ensemble(ensemble, dataloader, print_results=args.print_results)
+    layer_results = eval_ensemble(ensemble, dataloader, all_stats=args.split_by_program_correctness, print_results=args.print_results)
 
     for layer_idx, task_results in enumerate(layer_results):
-        accs = []
-        for task_idx, results in enumerate(task_results):
-            correct = results["correct"]
-            total = results["total"]
-            if total:
-                acc = correct / total * 100
-                accs.append(acc)
-            else:
-                accs.append("n/a")
-        print(f"{layer_idx=} {accs=}")
+        labels = ["total"]
+        if args.split_by_program_correctness:
+            labels += ["incorrect", "correct"]
+        accss = {label: [] for label in labels}
+        for results in task_results:
+            correct = {"total": results["correct"]}
+            total = {"total": results["total"]}
+            if args.split_by_program_correctness:
+                for label in ["incorrect", "correct"]:
+                    correct[label] = 0
+                    total[label] = 0
+                for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
+                    prog_correct = sample["results"][0]
+                    label = "correct" if prog_correct else "incorrect"
+                    correct[label] += sum(tensor.item() for tensor in probe_correct)
+                    total[label] += len(probe_correct)
+            for label, accs in accss.items():
+                if total[label]:
+                    acc = correct[label] / total[label] * 100
+                    accs.append(acc)
+                else:
+                    accs.append("n/a")
+        for label, accs in accss.items():
+            print(f"{layer_idx=} {label=} {accs=}")
 
 if __name__ == "__main__":
     main()

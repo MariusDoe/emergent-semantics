@@ -108,10 +108,11 @@ def layers(match: Match):
     yield LineResult(params={"mlp_layers": layers})
 
 task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
-@matcher(r"(?:final|acc).*\[([\d., ]+)\]")
+@matcher(r"(?:label='(.*?)')?(?:final|acc).*\[([\d., ]+)\]")
 def probe_accuracy(match: Match):
-    for index, accuracy in enumerate(match.group(1).split(",")):
-        params = {"task": task_names[index]}
+    params = {"program_correctness": match.group(1) or "total"}
+    for index, accuracy in enumerate(match.group(2).split(",")):
+        params["task"] = task_names[index]
         yield LineResult(accuracy=float(accuracy), params=params)
     yield LineResult(reset_params=True)
 
