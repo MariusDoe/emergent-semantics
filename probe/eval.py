@@ -28,6 +28,7 @@ def parse_args():
     )
     parser.add_argument("--probe_split")
     parser.add_argument("--print_label_frequencies", action="store_true")
+    parser.add_argument("--print_results", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -116,7 +117,7 @@ def main():
             for mlp_layers in layers]
             for ensemble_idx, num_class in enumerate(num_classes)]
             for task_idx, num_classes in enumerate(dataset.num_classes)]
-    layer_results = eval_ensemble(ensemble, dataloader, print_results=False)
+    layer_results = eval_ensemble(ensemble, dataloader, print_results=args.print_results)
 
     for layer_idx, task_results in enumerate(layer_results):
         accs = []

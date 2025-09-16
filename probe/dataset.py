@@ -443,7 +443,7 @@ def load_dataset(
         # ]
 
     mapped_ds = list(map(make_state_and_labels, filtered_ds))
-    return mapped_ds, [make_list(n) for n in num_classes]
+    return mapped_ds, [make_list(n) for n in num_classes], filtered_ds
 
 
 class SemanticKarelDataset(Dataset):
@@ -491,7 +491,7 @@ class SemanticKarelDataset(Dataset):
         self.std = std
         self.noise = noise
 
-        ds, self.num_classes = load_dataset(
+        ds, self.num_classes, filtered = load_dataset(
             self.config,
             self.tokenizer,
             filter_correct=self.filter_correct,
@@ -502,6 +502,7 @@ class SemanticKarelDataset(Dataset):
             max_samples=max_load_samples,
             single_label=single_label,
         )
+        self.filtered = filtered
         if self.flatten:
             ds = list(chain(*ds))
         self._ds = ds

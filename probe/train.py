@@ -26,6 +26,7 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 from data import karel
+from data.lib.karel_lib.karel.karel import Karel
 from utils import model as model_utils
 from probe.dataset import SemanticKarelDataset
 from probe.model import MLP
@@ -108,7 +109,7 @@ def train():
 
 
 @torch.no_grad()
-def eval_ensemble(ensemble, eval_dataloader, all_stats=False):
+def eval_ensemble(ensemble, eval_dataloader, all_stats=False, print_results=False):
     stats = []
 
     num_layers = len(ensemble[0][0])
@@ -161,6 +162,7 @@ def eval_ensemble(ensemble, eval_dataloader, all_stats=False):
             )
         )
 
+    program_index = -1
     for inputs, labels, idxs, lengths in eval_dataloader:
         # assert int(labels.size(-1)) == len(task_ensemble)
         inputs, labels = inputs.to(device), [l.to(device) for l in labels]
@@ -201,6 +203,30 @@ def eval_ensemble(ensemble, eval_dataloader, all_stats=False):
 
                     _predicted = torch.argmax(outputs, dim=1)
                     _correct = _predicted == ensemble_labels
+
+                    if print_results:
+                        dataset = eval_dataloader.dataset
+                        task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
+                        task_name = task_names[task_idx]
+                        local_program_index = program_index
+                        for token_index, predicted, actual, correct in zip(idxs, _predicted, ensemble_labels, _correct):
+                            token_index = token_index.item()
+                            predicted = predicted.tolist()
+                            actual = actual.tolist()
+                            correct = correct.tolist()
+                            if token_index == 0:
+                                local_program_index += 1
+                                print(f"{local_program_index=}")
+                            sample = dataset.filtered[local_program_index]
+                            if token_index == 0:
+                                print("program:")
+                                code_tokens = sample.get("code_tokens", sample.get("tokens"))
+                                print(dataset.tokenizer.decode(code_tokens))
+                            traces = sample["np_trace"]
+                            states = traces[0]
+                            state = states[(token_index,)][0]
+                            Karel(state=state).draw()
+                            print(f"{layer_idx=} {task_name=} {ensemble_idx=} {predicted=} {actual=} {correct=}")
 
                     mask = ensemble_labels >= 0
 
@@ -255,6 +281,10 @@ def eval_ensemble(ensemble, eval_dataloader, all_stats=False):
                     e_correct_by_end[task_idx][idx] += (
                         correct_all[end_mask].sum().item()
                     )
+
+        for idx in idxs:
+            if idx == 0:
+                program_index += 1
 
     l_results = []
     for layer_idx, (
