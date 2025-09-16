@@ -544,10 +544,6 @@ def main():
     )
     logger.info("Prepared accelerator")
 
-    # On TPU, the tie weights in our model have been disconnected, so we need to restore the ties.
-    if accelerator.distributed_type == DistributedType.TPU:
-        model.tie_weights()
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / gradient_accumulation_steps
