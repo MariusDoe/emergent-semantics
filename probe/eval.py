@@ -30,6 +30,7 @@ def parse_args():
     parser.add_argument("--print_label_frequencies", action="store_true")
     parser.add_argument("--print_results", action="store_true")
     parser.add_argument("--split_by_program_correctness", action="store_true")
+    parser.add_argument("--last_state_only", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -135,8 +136,12 @@ def main():
                 for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
                     prog_correct = sample["results"][0]
                     label = "correct" if prog_correct else "incorrect"
-                    correct[label] += sum(tensor.item() for tensor in probe_correct)
-                    total[label] += len(probe_correct)
+                    if args.last_state_only:
+                        correct[label] += probe_correct[-1].item()
+                        total[label] += 1
+                    else:
+                        correct[label] += sum(tensor.item() for tensor in probe_correct)
+                        total[label] += len(probe_correct)
             for label, accs in accss.items():
                 if total[label]:
                     acc = correct[label] / total[label] * 100
