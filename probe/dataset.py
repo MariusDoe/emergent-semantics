@@ -7,7 +7,8 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 
-from data.karel import ACTION_TOKENS, CONDITIONAL_TOKENS
+from data.karel import ACTION_TOKENS, CONDITIONAL_TOKENS, map_actions, post_process_output, pp_to_parseable
+from data.lib.karel_lib.karel import KarelWithCurlyParser
 from utils.cache import CACHE
 from probe.alt import semantics_transformer
 
@@ -56,6 +57,7 @@ def load_dataset(
     label_grid=True,
     max_samples=None,
     single_label=False,
+    rerun_code=False,
 ):
     """Returns a list of (hidden_state, label).
 
@@ -340,6 +342,13 @@ def load_dataset(
                 break
         return label_to_tensor(label)
 
+    def rerun_trace(trace, code_tokens):
+        input = trace[(0,)][0]
+        parser = KarelWithCurlyParser(run_with_trace=True)
+        parser.new_game(state=input)
+        parser.run(code_tokens)
+        return parser.get_trace()
+
     def make_state_and_labels(sample):
         # TODO get the intended end state as well
         traces = sample["np_trace"][:num_examples]
@@ -347,6 +356,19 @@ def load_dataset(
             if not all(t is None for t in traces):
                 print("Sample has partial failed traces:\n " f"{sample['text']}")
             return []
+
+        code_tokens = sample.get("code_tokens", sample.get("tokens"))
+        # No longer needed since we are loading the original tokenizer
+        # new_code_tokens = tokenizer(text)["input_ids"]
+        # assert len(old_code_tokens) == len(new_code_tokens)
+        # code_tokens = new_code_tokens
+
+        if rerun_code:
+            code = tokenizer.decode(code_tokens)
+            code = post_process_output(code)
+            code = pp_to_parseable(code)
+            code = map_actions(code, config.mapping)
+            traces = [rerun_trace(trace, code) for trace in traces]
 
         # print(sample.keys())
         # inputs = [sample[f"input{idx}"] for idx in range(num_examples)]
@@ -357,12 +379,6 @@ def load_dataset(
             keys |= trace.keys()
         keys = sorted(keys)
         keys.remove((0,))
-
-        code_tokens = sample.get("code_tokens", sample.get("tokens"))
-        # No longer needed since we are loading the original tokenizer
-        # new_code_tokens = tokenizer(text)["input_ids"]
-        # assert len(old_code_tokens) == len(new_code_tokens)
-        # code_tokens = new_code_tokens
 
         traj = list(zip_equal(sample["hidden_states"], code_tokens))
         if hidden_state_layer == loaded_hidden_state_layer:
@@ -463,6 +479,7 @@ class SemanticKarelDataset(Dataset):
         mean=None,
         std=None,
         noise=None,
+        rerun_code=False,
     ):
         if filter_active and filter_inactive:
             raise ValueError("Cannot filter both active and inactive: no samples left.")
@@ -501,6 +518,7 @@ class SemanticKarelDataset(Dataset):
             drop_last_state=drop_last,
             max_samples=max_load_samples,
             single_label=single_label,
+            rerun_code=rerun_code,
         )
         self.filtered = filtered
         if self.flatten:

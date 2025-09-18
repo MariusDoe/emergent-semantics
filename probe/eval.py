@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--probe_split")
     parser.add_argument("--print_label_frequencies", action="store_true")
     parser.add_argument("--print_results", action="store_true")
+    parser.add_argument("--rerun_code", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -60,6 +61,7 @@ def main():
         filter_correct=False,
         filter_inactive=dataset_config.eval_alt_active in ["0", "1"],
         single_label=not dataset_config.all_labels,
+        rerun_code=args.rerun_code,
     )
     if args.print_label_frequencies:
         from collections import Counter, defaultdict
