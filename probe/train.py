@@ -340,6 +340,36 @@ def eval_ensemble(ensemble, eval_dataloader, all_stats=False, print_results=Fals
         l_results.append(e_results)
     return l_results
 
+def print_probe_eval(layer_results, dataset, config):
+    for layer_idx, task_results in enumerate(layer_results):
+        labels = ["total"]
+        if config.split_by_program_correctness:
+            labels += ["incorrect", "correct"]
+        accss = {label: [] for label in labels}
+        for results in task_results:
+            correct = {"total": results["correct"]}
+            total = {"total": results["total"]}
+            if config.split_by_program_correctness:
+                for label in ["incorrect", "correct"]:
+                    correct[label] = 0
+                    total[label] = 0
+                for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
+                    prog_correct = sample["results"][0]
+                    label = "correct" if prog_correct else "incorrect"
+                    if config.last_state_only:
+                        correct[label] += probe_correct[-1].item()
+                        total[label] += 1
+                    else:
+                        correct[label] += sum(tensor.item() for tensor in probe_correct)
+                        total[label] += len(probe_correct)
+            for label, accs in accss.items():
+                if total[label]:
+                    acc = correct[label] / total[label] * 100
+                    accs.append(acc)
+                else:
+                    accs.append("n/a")
+        for label, accs in accss.items():
+            print(f"{layer_idx=} {label=} {accs=}")
 
 def train_with_config(
     config,
@@ -402,47 +432,6 @@ def train_with_config(
 
     num_tasks = 6
 
-    layers_to_skip = []
-    for layer in layers:
-        config = config.update(mlp_layers=layer)
-        base_dir = config.base_dir
-        results_fn = config.semantic_results_path
-
-        skip = False
-        if skip_if_exists and not config.debug and CACHE.check(results_fn):
-            try:
-                res = torch.load(results_fn, map_location="cpu")
-                meta_results_fn = config.semantic_results_meta_path
-                if not CACHE.check(meta_results_fn):
-                    make_meta_results(config, res)
-                skip = True
-            except:
-                pass
-        if skip:
-            layers_to_skip.append(layer)
-            print(f"{results_fn} already exists, skipping mlp_layers={layer}.")
-            final_acc = []
-            for results in res:
-                correct = results["correct"]
-                total = results["total"]
-                if total:
-                    acc = correct / total * 100
-                    final_acc.append(acc)
-                else:
-                    final_acc.append("n/a")
-            print(f"At final eval: {final_acc}")
-        else:
-            try:
-                os.remove(results_fn)
-            except:
-                pass
-
-    print(f"{layers_to_skip=}")
-    for layer in layers_to_skip:
-        layers.remove(layer)
-    if not layers:
-        return
-
     if val_dataset is None:
         val_config = config.update(split="val")
         val_dataset = SemanticKarelDataset(
@@ -473,6 +462,39 @@ def train_with_config(
                 mean=mean,
                 std=std,
             )
+
+    layers_to_skip = []
+    for layer in layers:
+        config = config.update(mlp_layers=layer)
+        base_dir = config.base_dir
+        results_fn = config.semantic_results_path
+
+        skip = False
+        res = None
+        if skip_if_exists and not config.debug and CACHE.check(results_fn):
+            try:
+                res = torch.load(results_fn, map_location="cpu")
+                meta_results_fn = config.semantic_results_meta_path
+                if not CACHE.check(meta_results_fn):
+                    make_meta_results(config, res)
+                skip = True
+            except:
+                pass
+        if skip:
+            layers_to_skip.append(layer)
+            print(f"{results_fn} already exists, skipping mlp_layers={layer}.")
+            print_probe_eval([res], eval_dataset, config)
+        else:
+            try:
+                os.remove(results_fn)
+            except:
+                pass
+
+    print(f"{layers_to_skip=}")
+    for layer in layers_to_skip:
+        layers.remove(layer)
+    if not layers:
+        return
 
     # assert len(eval_dataset.input_shape) == 1
     assert num_tasks == len(eval_dataset.num_classes)
@@ -787,30 +809,12 @@ def train_with_config(
 
     l_results = eval_ensemble(best_models, eval_dataloader, all_stats=True)
 
+    print_probe_eval(l_results, eval_dataset, config)
     best_results = []
-    for layer_idx, e_results in enumerate(l_results):
-        pbar.write(f"layer={layers[layer_idx]}")
-        final_acc = []
+    for e_results in l_results:
         best_results.append([])
-        for task_idx, results in enumerate(e_results):
-            best_results[layer_idx].append(results)
-
-            loss = results["loss"]
-            correct = results["correct"]
-            total = results["total"]
-            if total:
-                acc = correct / total * 100
-                final_acc.append(acc)
-            else:
-                final_acc.append("n/a")
-
-            # task_models = ensemble_models[task_idx]
-            # layer_models = [
-            #    task_model[layer_idx].state_dict() for task_model in task_models
-            # ]
-            # best_model[layer_idx][task_idx] = layer_models
-        pbar.write(f"Best during training: {best_acc[layer_idx]}")
-        pbar.write(f"At final eval: {final_acc}")
+        for results in e_results:
+            best_results[-1].append(results)
 
     if config.debug:
         for layer_idx, layer in enumerate(layers):
