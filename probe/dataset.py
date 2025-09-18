@@ -57,7 +57,6 @@ def load_dataset(
     label_grid=True,
     max_samples=None,
     single_label=False,
-    rerun_code=False,
 ):
     """Returns a list of (hidden_state, label).
 
@@ -363,7 +362,7 @@ def load_dataset(
         # assert len(old_code_tokens) == len(new_code_tokens)
         # code_tokens = new_code_tokens
 
-        if rerun_code:
+        if config.rerun_code:
             code = tokenizer.decode(code_tokens)
             code = post_process_output(code)
             code = pp_to_parseable(code)
@@ -479,7 +478,6 @@ class SemanticKarelDataset(Dataset):
         mean=None,
         std=None,
         noise=None,
-        rerun_code=False,
     ):
         if filter_active and filter_inactive:
             raise ValueError("Cannot filter both active and inactive: no samples left.")
@@ -518,7 +516,6 @@ class SemanticKarelDataset(Dataset):
             drop_last_state=drop_last,
             max_samples=max_load_samples,
             single_label=single_label,
-            rerun_code=rerun_code,
         )
         self.filtered = filtered
         if self.flatten:
