@@ -186,6 +186,8 @@ class Config:
             fn.append(self.split)
         if self.seed is not None:
             fn.append(f"seed{self.seed}")
+        if self.rerun_code:
+            fn.append("rerun")
         if self.debug:
             fn.append("debug")
         return "_".join(fn)

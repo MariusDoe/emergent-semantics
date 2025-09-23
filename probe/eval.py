@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument("--probe_dataset_name")
     parser.add_argument("--probe_output_dir")
     parser.add_argument("--probe_checkpoint_steps", type=int)
+    parser.add_argument("--probe_rerun_code", action="store_true")
     parser.add_argument(
         "--per_device_eval_batch_size",
         type=int,
@@ -90,6 +91,7 @@ def main():
         output_dir=args.probe_output_dir or args.output_dir,
         step=args.probe_checkpoint_steps or args.checkpoint_steps,
         split=args.probe_split or args.split,
+        rerun_code=args.probe_rerun_code,
     )
 
     def load_model(task_idx, ensemble_idx, num_class, mlp_layers):
