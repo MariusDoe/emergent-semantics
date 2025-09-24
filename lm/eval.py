@@ -325,8 +325,8 @@ def eval_with_config_and_model(
     if not save_results and make_semantic_dataset:
         raise ValueError("Not saving results but also asked to make semantic dataset.")
 
-    if skip_if_exists and not make_semantic_dataset:
-        raise ValueError("skip_if_exists and wait_until_exists are only allowed with make_semantic_dataset")
+    if skip_if_exists and not (make_semantic_dataset ^ bool(make_dataset)):
+        raise ValueError("skip_if_exists is only allowed with exactly one of make_semantic_dataset and make_dataset")
 
     if max_length is None:
         if mode == "interp":
@@ -375,6 +375,10 @@ def eval_with_config_and_model(
             return
 
         print(f"Making semantic dataset at {semantic_ds_path}")
+
+    if make_dataset and skip_if_exists and CACHE.check(f"{make_dataset}.jsonl"):
+        print(f"Skipping making of dataset at {make_dataset}")
+        return
 
     semantic_eval_ds = []
     all_results = []
