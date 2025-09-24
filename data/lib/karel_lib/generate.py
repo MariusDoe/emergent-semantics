@@ -4,11 +4,11 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from sample_progs import generate_random_with_distribution
+from .sample_progs import generate_random_with_distribution
 
 # from karel import KarelWithCurlyConfigurableParser, KarelForSynthesisConfigurableParser
-from karel import KarelWithCurlyParser, KarelForSynthesisParser
-from karel import str2bool, makedirs, pprint, beautify, TimeoutError
+from .karel import KarelWithCurlyParser, KarelForSynthesisParser
+from .karel import str2bool, makedirs, pprint, beautify, TimeoutError
 
 
 def main():

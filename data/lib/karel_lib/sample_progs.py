@@ -1,6 +1,6 @@
-from karel import KarelWithCurlyConfigurableParser
-from karel.utils import get_rng, map_actions
-from karel.karel import Karel
+from .karel import KarelWithCurlyConfigurableParser
+from .karel.utils import get_rng, map_actions
+from .karel.karel import Karel
 import random
 import copy
 
