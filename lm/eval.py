@@ -20,6 +20,9 @@ from utils.cache import CACHE
 from utils.config import Config
 import warnings
 from data.lib.karel_lib.karel import KarelWithCurlyParser
+from data.lib.karel_lib.sample_progs import generate_dataset
+from data.lib.karel_lib.generate import save_dataset
+from data.lib.karel_lib.karel.karel import Karel
 
 warnings.simplefilter("ignore", UserWarning)
 
@@ -73,6 +76,10 @@ def parse_args():
         help="Whether to save the evaluation as a semantic dataset.",
     )
     parser.add_argument(
+        "--make_dataset",
+        help="Path to the directory where to save a karel dataset generated from the LM's responses",
+    )
+    parser.add_argument(
         "--generate_trace",
         action="store_true",
         help="Whether to generate traces.",
@@ -115,6 +122,7 @@ def eval():
 
     batch_size = args.per_device_eval_batch_size
     make_semantic_dataset = args.make_semantic_dataset
+    make_dataset = args.make_dataset
     generate_trace = args.generate_trace
     max_eval_samples = args.max_eval_samples
     k = args.k
@@ -134,6 +142,7 @@ def eval():
         resume,
         show_responses=show_responses,
         skip_if_exists=skip_if_exists,
+        make_dataset=make_dataset,
     )
 
 
@@ -224,6 +233,7 @@ def eval_with_config(
     resume,
     show_responses=False,
     skip_if_exists=False,
+    make_dataset=None,
 ):
     model, tokenizer = model_utils.load_pretrained(
         config, load_in_8bit=False, use_fast_tokenizer=True, add_new_actions=True
@@ -242,6 +252,7 @@ def eval_with_config(
         resume,
         show_responses=show_responses,
         skip_if_exists=skip_if_exists,
+        make_dataset=make_dataset,
     )
 
 
@@ -293,6 +304,7 @@ def eval_with_config_and_model(
     state_dataset=None,
     save_results=True,
     skip_if_exists=False,
+    make_dataset=None,
 ):
     forced_decoding = config.forced_decoding
     grammar_decoding = config.grammar_decoding
@@ -366,6 +378,7 @@ def eval_with_config_and_model(
 
     semantic_eval_ds = []
     all_results = []
+    generated_programs = []
 
     resume_count = 0
     cache_hit = False
@@ -774,6 +787,13 @@ def eval_with_config_and_model(
                     print(result["results"])
                     print("=" * 20)
 
+            if make_dataset:
+                start_states = [Karel(state=spec_input) for spec_input, _spec_output in spec_examples]
+                for response in responses:
+                    code = karel.post_process_output(response)
+                    code = karel.pp_to_parseable(code)
+                    generated_programs.append((code, start_states))
+
             all_results.append(results_for_responses)
 
             is_correct = 0
@@ -909,6 +929,10 @@ def eval_with_config_and_model(
                 idx = str(idx).zfill(3)
                 semantic_ds_part = f"{semantic_ds_path}-{idx}"
                 torch.save(semantic_eval_ds[last_total:total], semantic_ds_part)
+
+    if make_dataset:
+        generated_dataset = generate_dataset(generated_programs)
+        save_dataset(generated_dataset, make_dataset)
 
     if make_semantic_dataset:
         print(

@@ -186,52 +186,58 @@ def generate_random_with_distribution(
         assert state is not None
         return "\n".join(state)
 
-    programs = []
     total = sum(distribution)
-    for _ in tqdm(range(total)):
-        # Pick a random length to generate
-        random_len = random.choices(range(len(distribution)), weights=distribution)[0]
-        # Decrement the value at sampled index
-        distribution[random_len] -= 1
-        # Distribution is 1-indexed
-        random_len += 1
 
+    def generate_programs():
+        for _ in tqdm(range(total)):
+            # Pick a random length to generate
+            random_len = random.choices(range(len(distribution)), weights=distribution)[0]
+            # Decrement the value at sampled index
+            distribution[random_len] -= 1
+            # Distribution is 1-indexed
+            random_len += 1
+
+            start_states = [] if force_interesting_pushes else make_states(num_states=10)
+            while True:
+                states = copy.deepcopy(start_states)[:5]
+                body = generate_stmts(random_len, states)
+                if not force_action or force_action in body:
+                    break
+            program = f"def run() {{ {body} }}"
+            mapped_program = map_actions(program, mapping)
+            if force_interesting_pushes:
+                while len(start_states) < 10:
+                    [start_state] = make_states(num_states=1)
+                    state = copy.deepcopy(start_state)
+                    parser.karel = state
+                    parser.run(mapped_program)
+                    if state.num_interesting_pushes > 0:
+                        start_states.append(start_state)
+                        states.append(state)
+            yield mapped_program, start_states
+    programs = generate_dataset(generate_programs())
+    assert sum(distribution) == 0
+    assert len(programs) == total
+    return programs
+
+def generate_dataset(generator):
+    programs = []
+    for program, start_states in generator:
         record = {}
         np_record = {}
 
-        start_states = [] if force_interesting_pushes else make_states(num_states=10)
-        while True:
-            states = copy.deepcopy(start_states)[:5]
-            body = generate_stmts(random_len, states)
-            if not force_action or force_action in body:
-                break
-        program = f"def run() {{ {body} }}"
-        mapped_program = map_actions(program, mapping)
-        if force_interesting_pushes:
-            while len(start_states) < 10:
-                [start_state] = make_states(num_states=1)
-                state = copy.deepcopy(start_state)
-                parser.karel = state
-                parser.run(mapped_program)
-                if state.num_interesting_pushes > 0:
-                    start_states.append(start_state)
-                    states.append(state)
         for idx in range(len(start_states)):
             record[f"input{idx}"] = karel_to_string(start_states[idx])
             np_record[f"input{idx}"] = start_states[idx].state
 
         for idx in range(len(start_states)):
-            parser.karel = start_states[idx]
-            parser.run(mapped_program)
+            parser.karel = copy.deepcopy(start_states[idx])
+            parser.run(program)
             end_state = parser.karel
-            if idx < len(states):
-                assert check_state(states[idx], end_state)
             record[f"output{idx}"] = karel_to_string(end_state)
             np_record[f"output{idx}"] = end_state.state
 
         programs.append((program, record, np_record))
-    assert sum(distribution) == 0
-    assert len(programs) == total
     return programs
 
 

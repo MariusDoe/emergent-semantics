@@ -11,7 +11,7 @@ from karel import KarelWithCurlyParser, KarelForSynthesisParser
 from karel import str2bool, makedirs, pprint, beautify, TimeoutError
 
 
-if __name__ == "__main__":
+def main():
     data_arg = argparse.ArgumentParser()
     data_arg.add_argument("--num_train", type=int, default=1000000)
     data_arg.add_argument("--num_test", type=int, default=10000)
@@ -128,10 +128,6 @@ if __name__ == "__main__":
         for idx in range(config.min_length - 1):
             distribution[idx] = 0
 
-        text = ""
-        records = []
-        np_records = []
-
         progs = generate_random_with_distribution(
             distribution,
             no_noops=config.no_noops,
@@ -140,20 +136,29 @@ if __name__ == "__main__":
             force_interesting_pushes=config.force_interesting_pushes,
             mapping=config.mapping,
         )
-        for code, record, np_record in progs:
-            if config.beautify:
-                code = beautify(code)
-            text += code + "\n"
-            record["code"] = code
-            records.append(record)
-            np_records.append(np_record)
-
         save_path = os.path.join(data_dir, name)
+        save_dataset(progs, save_path, do_beautify=config.beautify)
 
-        df = pd.DataFrame.from_records(records)
-        df.to_json(f"{save_path}.jsonl", orient="records", lines=True)
+def save_dataset(progs, save_path, do_beautify=False):
+    text = ""
+    records = []
+    np_records = []
 
-        with open(f"{save_path}.txt", "w") as f:
-            f.write(text)
+    for code, record, np_record in progs:
+        if do_beautify:
+            code = beautify(code)
+        text += code + "\n"
+        record["code"] = code
+        records.append(record)
+        np_records.append(np_record)
 
-        np.savez(f"{save_path}.npz", records=np_records)
+    df = pd.DataFrame.from_records(records)
+    df.to_json(f"{save_path}.jsonl", orient="records", lines=True)
+
+    with open(f"{save_path}.txt", "w") as f:
+        f.write(text)
+
+    np.savez(f"{save_path}.npz", records=np_records)
+
+if __name__ == "__main__":
+    main()
