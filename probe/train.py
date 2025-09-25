@@ -27,8 +27,10 @@ from tqdm.auto import tqdm
 
 from data import karel
 from data.lib.karel_lib.karel.karel import Karel
+from data.karel import map_actions, post_process_output, pp_to_parseable
+from data.lib.karel_lib.karel import KarelWithCurlyParser
 from utils import model as model_utils
-from probe.dataset import SemanticKarelDataset
+from probe.dataset import SemanticKarelDataset, get_grid_label, get_pos
 from probe.model import MLP
 from utils.cache import CACHE
 from utils.config import Config
@@ -346,22 +348,48 @@ def print_probe_eval(layer_results, dataset, config):
         if config.split_by_program_correctness:
             labels += ["incorrect", "correct"]
         accss = {label: [] for label in labels}
-        for results in task_results:
-            correct = {"total": results["correct"]}
-            total = {"total": results["total"]}
-            if config.split_by_program_correctness:
-                for label in ["incorrect", "correct"]:
-                    correct[label] = 0
-                    total[label] = 0
-                for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
+        for task_index, results in enumerate(task_results):
+            correct = {}
+            total = {}
+            for label in labels:
+                correct[label] = 0
+                total[label] = 0
+            for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
+                probe_correct = [tensor.item() for tensor in probe_correct]
+                if config.last_state_only:
+                    probe_correct = [probe_correct[-1]]
+                if config.only_differing_labels_under_mapping:
+                    raw_code = sample["text"]
+                    raw_code = post_process_output(raw_code)
+                    raw_code = pp_to_parseable(raw_code)
+                    mapped_code = map_actions(raw_code, config.only_differing_labels_under_mapping)
+                    input, _ = sample["spec"][0]
+                    start_x, start_y, _ = get_pos(input)
+
+                    def labels_for(code):
+                        parser = KarelWithCurlyParser(run_with_trace=True)
+                        parser.new_game(state=input)
+                        parser.run(code)
+                        trace = parser.get_trace()
+                        code_length = max(trace.keys())
+                        output = trace[code_length][0]
+                        end_x, end_y, _ = get_pos(output)
+                        (code_length,) = code_length
+                        if config.last_state_only:
+                            states = [parser.karel.state]
+                        else:
+                            states = [trace[(index + 1,)][0] for index in range(code_length)]
+                        return [get_grid_label(state, start_x, start_y, end_x, end_y)[task_index] for state in states]
+
+                    probe_correct = [is_correct for is_correct, raw_labels, mapped_labels in zip(probe_correct, labels_for(raw_code), labels_for(mapped_code)) if raw_labels != mapped_labels]
+
+                add_to_labels = ["total"]
+                if config.split_by_program_correctness:
                     prog_correct = sample["results"][0]
-                    label = "correct" if prog_correct else "incorrect"
-                    if config.last_state_only:
-                        correct[label] += probe_correct[-1].item()
-                        total[label] += 1
-                    else:
-                        correct[label] += sum(tensor.item() for tensor in probe_correct)
-                        total[label] += len(probe_correct)
+                    add_to_labels.append("correct" if prog_correct else "incorrect")
+                for label in add_to_labels:
+                    correct[label] += sum(probe_correct)
+                    total[label] += len(probe_correct)
             for label, accs in accss.items():
                 if total[label]:
                     acc = correct[label] / total[label] * 100

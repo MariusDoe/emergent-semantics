@@ -75,6 +75,7 @@ class Config:
         self.eval_alt_active = args.eval_alt_active
         self.split_by_program_correctness = args.split_by_program_correctness
         self.last_state_only = args.last_state_only
+        self.only_differing_labels_under_mapping = args.only_differing_labels_under_mapping
         self.rerun_code = args.rerun_code
         self.split = args.split
         self.forced_decoding = args.forced_decode
@@ -574,6 +575,11 @@ class Config:
         )
         parser.add_argument("--split_by_program_correctness", action="store_true")
         parser.add_argument("--last_state_only", action="store_true")
+        parser.add_argument(
+            "--only_differing_labels_under_mapping",
+            default=[],
+            nargs="*",
+            help="Same syntax as --mapping. When evaluating a probe, exclude programs that have the same labels with and without this mapping")
         parser.add_argument("--rerun_code", action="store_true")
 
         parser.add_argument(

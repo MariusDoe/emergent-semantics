@@ -119,7 +119,7 @@ def main():
             for mlp_layers in layers]
             for ensemble_idx, num_class in enumerate(num_classes)]
             for task_idx, num_classes in enumerate(dataset.num_classes)]
-    layer_results = eval_ensemble(ensemble, dataloader, all_stats=args.split_by_program_correctness, print_results=args.print_results)
+    layer_results = eval_ensemble(ensemble, dataloader, all_stats=True, print_results=args.print_results)
     print_probe_eval(layer_results, dataset, dataset_config)
 
 if __name__ == "__main__":

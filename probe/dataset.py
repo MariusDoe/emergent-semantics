@@ -43,6 +43,71 @@ def zip_equal(*iterables):
     return chain(zip(first, *rest), zip_tail())
 
 
+def get_pos(state):
+    y, x, facing_idx = zip(*np.where(state[:, :, :4] == 1)).__next__()
+    return x, y, facing_idx
+
+
+def get_grid_label(
+    state,
+    start_x,
+    start_y,
+    end_x,
+    end_y,
+    label_relative_direction=True,
+    label_facing=True,
+    label_position=True,
+    label_grid=True,
+):
+    labels = []
+
+    facing = {
+        0: (0, -1),
+        1: (0, 1),
+        2: (-1, 0),
+        3: (1, 0),
+    }
+    x, y, facing_idx = get_pos(state)
+    labels.append(facing_idx)
+
+    if label_relative_direction:
+        # if start_x == end_x and start_y == end_y:
+        #    labels.extend([[-1, -1], [-1, -1]])
+        # else:
+        labels.append([x - start_x + 6, y - start_y + 6])
+        labels.append([x - end_x + 6, y - end_y + 6])
+
+    if label_facing:
+        # if token in move_tokens:
+        dx, dy = facing[facing_idx]
+        idx = state[y + dy, x + dx, 4]
+        assert idx in [0, 1]
+        labels.append(idx)
+        # else:
+        #    labels.append(-1)
+
+    if label_position:
+        # pos_labels = [0] * (dim_x * dim_y)
+        # pos_labels[y * dim_y + x] = 1
+        # labels.extend(pos_labels)
+        # labels.append(x * dim_y + y)
+        labels.append([x - 1, y - 1])
+
+    if label_grid:
+        label = []
+        for dx in [-1, 1]:
+            idx = state[y, x + dx, 4]
+            assert idx in [0, 1]
+            label.append(idx)
+        for dy in [-1, 1]:
+            idx = state[y + dy, x, 4]
+            assert idx in [0, 1]
+            label.append(idx)
+        labels.append(label)
+
+    return labels
+
+
 def load_dataset(
     config,
     tokenizer,
@@ -235,59 +300,6 @@ def load_dataset(
     else:
         maybe_drop_last = lambda lst: lst
 
-    def get_pos(state):
-        y, x, facing_idx = zip(*np.where(state[:, :, :4] == 1)).__next__()
-        return x, y, facing_idx
-
-    def get_grid_label(state, start_x, start_y, end_x, end_y, token=None):
-        labels = []
-
-        facing = {
-            0: (0, -1),
-            1: (0, 1),
-            2: (-1, 0),
-            3: (1, 0),
-        }
-        x, y, facing_idx = get_pos(state)
-        labels.append(facing_idx)
-
-        if label_relative_direction:
-            # if start_x == end_x and start_y == end_y:
-            #    labels.extend([[-1, -1], [-1, -1]])
-            # else:
-            labels.append([x - start_x + 6, y - start_y + 6])
-            labels.append([x - end_x + 6, y - end_y + 6])
-
-        if label_facing:
-            # if token in move_tokens:
-            dx, dy = facing[facing_idx]
-            idx = state[y + dy, x + dx, 4]
-            assert idx in [0, 1]
-            labels.append(idx)
-            # else:
-            #    labels.append(-1)
-
-        if label_position:
-            # pos_labels = [0] * (dim_x * dim_y)
-            # pos_labels[y * dim_y + x] = 1
-            # labels.extend(pos_labels)
-            # labels.append(x * dim_y + y)
-            labels.append([x - 1, y - 1])
-
-        if label_grid:
-            label = []
-            for dx in [-1, 1]:
-                idx = state[y, x + dx, 4]
-                assert idx in [0, 1]
-                label.append(idx)
-            for dy in [-1, 1]:
-                idx = state[y + dy, x, 4]
-                assert idx in [0, 1]
-                label.append(idx)
-            labels.append(label)
-
-        return labels
-
     def traces_to_label(traces, key, token, active):  # , inputs, outputs):
         """
         traces is a list of num_examples traces
@@ -323,7 +335,17 @@ def load_dataset(
             state = state[0]
 
             if token in action_tokens:
-                l = get_grid_label(state, start_x, start_y, end_x, end_y, token)
+                l = get_grid_label(
+                    state,
+                    start_x,
+                    start_y,
+                    end_x,
+                    end_y,
+                    label_relative_direction=label_relative_direction,
+                    label_facing=label_facing,
+                    label_position=label_position,
+                    label_grid=label_grid,
+                )
                 if len(l) < len(num_classes):
                     assert len(l) == len(num_classes) - 1
                     # For the conditional branch prediction
