@@ -105,7 +105,6 @@ def main():
     if config.no_noops:
         data_dir += "_nonoops"
 
-    makedirs(data_dir)
     datasets = ["train", "test", "val"]
 
     # Generate datasets
@@ -140,6 +139,7 @@ def main():
         save_dataset(progs, save_path, do_beautify=config.beautify)
 
 def save_dataset(progs, save_path, do_beautify=False):
+    makedirs(os.path.dirname(save_path))
     text = ""
     records = []
     np_records = []
