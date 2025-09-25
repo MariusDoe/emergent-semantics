@@ -859,6 +859,7 @@ def eval_with_config_and_model(
 
                     sem_result = {
                         "idx": total,
+                        "spec": spec_examples,
                         "text": response,
                         "tokens": response_tokens,
                         "scores": response_scores,
