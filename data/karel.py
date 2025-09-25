@@ -27,12 +27,14 @@ TYPE_TO_EXT = {
     "text": "txt",
 }
 
-
-def load_karel_raw(split, data_folder, data_for="huggingface"):
+def karel_file_name(split, data_folder, data_for="huggingface"):
     if not data_for in TYPE_TO_EXT:
         raise ValueError(f"{data_for=} not in {TYPE_TO_EXT.keys()=}")
     ext = TYPE_TO_EXT[data_for]
-    fn = f"{BASE_DIR}/{data_folder}/{split}.{ext}"
+    return f"{BASE_DIR}/{data_folder}/{split}.{ext}", ext
+
+def load_karel_raw(split, data_folder, data_for="huggingface"):
+    fn, ext = karel_file_name(split, data_folder, data_for=data_for)
     if ext == "jsonl":
         return load_dataset("json", data_files=fn)
     elif ext == "npz":

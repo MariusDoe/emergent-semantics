@@ -77,7 +77,7 @@ def parse_args():
     )
     parser.add_argument(
         "--make_dataset",
-        help="Path to the directory where to save a karel dataset generated from the LM's responses",
+        help="Name as which to save a karel dataset generated from the LM's responses",
     )
     parser.add_argument(
         "--generate_trace",
@@ -376,9 +376,12 @@ def eval_with_config_and_model(
 
         print(f"Making semantic dataset at {semantic_ds_path}")
 
-    if make_dataset and skip_if_exists and CACHE.check(f"{make_dataset}.jsonl"):
-        print(f"Skipping making of dataset at {make_dataset}")
-        return
+    make_dataset_path = None
+    if make_dataset:
+        make_dataset_path, _ = karel.karel_file_name(config.split, make_dataset)
+        if skip_if_exists and CACHE.check(make_dataset_path):
+            print(f"Skipping making of dataset at {make_dataset}")
+            return
 
     semantic_eval_ds = []
     all_results = []
@@ -936,7 +939,8 @@ def eval_with_config_and_model(
 
     if make_dataset:
         generated_dataset = generate_dataset(generated_programs)
-        save_dataset(generated_dataset, make_dataset)
+        without_ext, _ = os.path.splitext(make_dataset_path)
+        save_dataset(generated_dataset, without_ext)
 
     if make_semantic_dataset:
         print(
