@@ -11,6 +11,7 @@ from probe.dataset import SemanticKarelDataset
 from probe.model import MLP
 from probe.train import eval_ensemble, print_probe_eval
 from utils.config import Config
+from collections import Counter, defaultdict
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate a trained probe on a semantic dataset")
@@ -29,6 +30,7 @@ def parse_args():
     )
     parser.add_argument("--probe_split")
     parser.add_argument("--print_label_frequencies", action="store_true")
+    parser.add_argument("--print_token_frequencies", action="store_true")
     parser.add_argument("--print_results", action="store_true")
     args = parser.parse_args()
     return args
@@ -54,16 +56,37 @@ def main():
         )
         karel.add_tokens(tokenizer, dataset_config.new_actions)
 
-    dataset = SemanticKarelDataset(
-        dataset_config,
-        tokenizer,
-        drop_last=dataset_config.drop_last,
-        filter_correct=False,
-        filter_inactive=dataset_config.eval_alt_active in ["0", "1"],
-        single_label=not dataset_config.all_labels,
-    )
+    def load_dataset(**kwargs):
+        return SemanticKarelDataset(
+            dataset_config,
+            tokenizer,
+            drop_last=dataset_config.drop_last,
+            filter_inactive=dataset_config.eval_alt_active in ["0", "1"],
+            single_label=not dataset_config.all_labels,
+            **{"filter_correct": False, **kwargs},
+        )
+
+    if args.print_token_frequencies:
+        action_tokens = {tokenizer(action)["input_ids"][0]: action for action in karel.ACTION_TOKENS + dataset_config.new_actions}
+        for label, dataset in [
+            ("total", load_dataset()),
+            ("correct", load_dataset(filter_correct=True)),
+            ("incorrect", load_dataset(filter_incorrect=True)),
+        ]:
+            counter = Counter()
+            for sample in dataset.filtered:
+                code_tokens = sample["code_tokens"]
+                for token in code_tokens:
+                    if token in action_tokens:
+                        counter[token] += 1
+            total = counter.total()
+            for token, action in action_tokens:
+                print(f"token frequency for {label=} {action=}: {counter[token] / total}")
+        return
+
+    dataset = load_dataset()
+
     if args.print_label_frequencies:
-        from collections import Counter, defaultdict
         task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
         buckets = defaultdict(lambda: Counter())
         for labels in dataset.labels:

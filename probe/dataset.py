@@ -112,6 +112,7 @@ def load_dataset(
     config,
     tokenizer,
     filter_correct,
+    filter_incorrect,
     filter_active,
     filter_inactive,
     filter_lengths=None,
@@ -256,10 +257,12 @@ def load_dataset(
 
     print(f"{num_classes=}")
 
-    if filter_correct:
-        filter_fn = lambda x: all(x["results"][:num_examples])
+    if filter_correct or filter_incorrect:
+        assert not (filter_correct and filter_incorrect)
+        filter_fn = lambda x: x["results"][0] ^ filter_incorrect
         filtered_ds = list(filter(filter_fn, ds))
-        print(f"Filtered out {len(ds) - len(filtered_ds)} incorrect examples.")
+        filtered_label = "correct" if filter_incorrect else "incorrect"
+        print(f"Filtered out {len(ds) - len(filtered_ds)} {filtered_label} examples.")
     else:
         filtered_ds = ds
 
@@ -490,6 +493,7 @@ class SemanticKarelDataset(Dataset):
         tokenizer,
         drop_last,
         filter_correct=True,
+        filter_incorrect=False,
         filter_inactive=False,
         filter_active=False,
         filter_lengths=None,
@@ -516,6 +520,7 @@ class SemanticKarelDataset(Dataset):
         self.tokenizer = tokenizer
         self.drop_last = drop_last
         self.filter_correct = filter_correct
+        self.filter_incorrect = filter_incorrect
         self.filter_active = filter_active
         self.filter_inactive = filter_inactive
         self.filter_lengths = filter_lengths
@@ -532,6 +537,7 @@ class SemanticKarelDataset(Dataset):
             self.config,
             self.tokenizer,
             filter_correct=self.filter_correct,
+            filter_incorrect=self.filter_incorrect,
             filter_active=self.filter_active,
             filter_inactive=self.filter_inactive,
             filter_lengths=self.filter_lengths,
