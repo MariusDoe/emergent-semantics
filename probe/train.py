@@ -354,7 +354,6 @@ def print_probe_eval(layer_results, dataset, config):
                 probe_corrects = {"": base_probe_correct}
                 if config.last_state_only:
                     probe_corrects["_last"] = [base_probe_correct[-1]]
-                add_to_labels = {f"total{label_suffix}": probe_correct for label_suffix, probe_correct in probe_corrects.items()}
                 if config.only_differing_labels_under_mapping:
                     raw_code = sample["text"]
                     raw_code = post_process_output(raw_code)
@@ -385,6 +384,7 @@ def print_probe_eval(layer_results, dataset, config):
                             if raw_labels != mapped_labels
                         ] for label_suffix, probe_correct in probe_corrects.items()
                     })
+                add_to_labels = {f"total{label_suffix}": probe_correct for label_suffix, probe_correct in probe_corrects.items()}
 
                 if config.split_by_program_correctness:
                     prog_correct = sample["results"][0]

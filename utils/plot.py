@@ -4,7 +4,6 @@ import math
 import matplotlib.pyplot as plt
 import shlex
 import sys
-from scipy.signal import savgol_filter
 from dataclasses import dataclass, field
 from matplotlib.colors import TABLEAU_COLORS
 from matplotlib.artist import Artist
@@ -28,6 +27,7 @@ parser.add_argument("--title", default="Accuracy over Steps")
 parser.add_argument("--max_step", type=int)
 parser.add_argument("--add_points", nargs="*", default=[])
 parser.add_argument("--show_only", nargs="*", default=[])
+parser.add_argument("--hide", nargs="*", default=[])
 parser.add_argument("--remap_steps", nargs="*", default=[])
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--smooth", type=int)
@@ -46,22 +46,22 @@ class LineResult:
     reset_params: bool = False
 
 Match = re.Match[str]
-Matcher = Callable[[str], Generator[LineResult]]
+Matcher = Callable[[str, StrDict], Generator[LineResult]]
 
 matchers: list[Matcher] = []
 def matcher(pattern_string: str):
     pattern = re.compile(pattern_string)
-    def create_match(function: Callable[[Match], Generator[LineResult]]):
-        def find(line: str):
+    def create_match(function: Callable[[Match, StrDict], Generator[LineResult]]):
+        def find(line: str, params: StrDict):
             match = pattern.search(line)
             if not match:
                 return
-            yield from function(match)
+            yield from function(match, params)
         matchers.append(find)
     return create_match
 
 @matcher(r"step (\d+): acc: ([0-9.]+)")
-def model_training(match: Match):
+def model_training(match: Match, _params: StrDict):
     step = int(match.group(1))
     if skip_step(step):
         return
@@ -69,7 +69,7 @@ def model_training(match: Match):
     yield LineResult(step=step, accuracy=accuracy, reset_params=True)
 
 @matcher(r'^(?:args=)?Namespace\((.*)\)$')
-def namespace(match: Match):
+def namespace(match: Match, _params: StrDict):
     params_line = match.group(1)
     params_line = f"{{{params_line}}}"
     params_line = re.sub(r'(\w+)=', r'"\1":', params_line)
@@ -82,13 +82,13 @@ def namespace(match: Match):
     yield LineResult(params=params)
 
 @matcher(r"python -m (\S+)")
-def python_module(match: Match):
+def python_module(match: Match, _params: StrDict):
     module = match.group(1)
     yield LineResult(params={"python_module": module})
 
 def phrase_matcher(phrase, name):
     @matcher(phrase)
-    def find(_match: Match):
+    def find(_match: Match, _params: StrDict):
         yield LineResult(params={"name": name})
 
 phrase_matcher("eval frozen probe", "frozen")
@@ -96,25 +96,30 @@ phrase_matcher("training probe for checkpoint", "from_scratch")
 phrase_matcher("training probe on base model", "base_model")
 
 @matcher(r"(?:step_|checkpoint\s+)(\d+)")
-def probe_step(match: Match):
+def probe_step(match: Match, _params: StrDict):
     if "Wrote" in match.string:
         return
     step = int(match.group(1))
     yield LineResult(step=step)
 
 @matcher(r"with (\d+) layers")
-def layers(match: Match):
+def layers(match: Match, _params: StrDict):
     layers = int(match.group(1))
     yield LineResult(params={"mlp_layers": layers})
 
 task_names = ["facing", "pos_rel_to_start", "pos_rel_to_end", "facing_wall", "pos", "walls_around"]
-@matcher(r"(?:label='(.*?)')?(?:final|acc).*\[([\d., ]+)\]")
-def probe_accuracy(match: Match):
-    params = {"program_correctness": match.group(1) or "total"}
+@matcher(r"(?:label='(.*)'.*)?(?:final|acc).*\[([\d., n/a']+)\]")
+def probe_accuracy(match: Match, params: StrDict):
+    program_correctness = match.group(1) or "total"
+    new_params = {"program_correctness": program_correctness}
     for index, accuracy in enumerate(match.group(2).split(",")):
-        params["task"] = task_names[index]
-        yield LineResult(accuracy=float(accuracy), params=params)
-    yield LineResult(reset_params=True)
+        new_params["task"] = task_names[index]
+        try:
+            yield LineResult(accuracy=float(accuracy), params=new_params)
+        except ValueError:
+            pass
+    if not params.get("split_by_program_correctness") or program_correctness == "correct":
+        yield LineResult(reset_params=True)
 
 class hashabledict(dict):
     def __hash__(self):
@@ -122,11 +127,27 @@ class hashabledict(dict):
 
 def derive_name(params: StrDict):
     module = params.get("python_module")
-    if module == "probe.eval":
-        return "from_scratch_train" if params.get("split") == "train" else "frozen"
-    if module == "probe.train":
-        return "from_scratch" if len(params.get("mapping", [])) > 0 else "base_model"
-    return params.get("name")
+    if module not in ["probe.eval", "probe.train"]:
+        return params.get("name")
+    name = "from_scratch"
+    dataset = params.get("dataset_name")
+    rerun = params.get("rerun_code")
+    if (params.get("probe_dataset_name") or dataset) != dataset:
+        name = "frozen"
+    else:
+        if params.get("probe_rerun_code") or module == "probe.train" and rerun:
+            name += "_old"
+        else:
+            name += "_new"
+    if rerun:
+        name += "_old"
+    else:
+        name += "_new"
+    if not rerun and len(params.get("mapping", [])) == 0:
+        name = "base_model"
+    if params.get("split") == "train":
+        name += "_train"
+    return name
 
 def remove_prefix(string: str, prefix: str):
     if string.startswith(prefix):
@@ -168,7 +189,7 @@ def find_points(lines: list[str]):
     step = None
     for line in lines:
         for matcher in matchers:
-            for result in matcher(line):
+            for result in matcher(line, params):
                 params.update(result.params)
                 if result.step is not None:
                     step = result.step
@@ -188,12 +209,17 @@ def parse_value(value: str):
     except:
         return value
 
-show_only = [{key: parse_value(value) for key, value in (show.split(":") for show in show_only.split(","))} for show_only in args.show_only]
+def parse_clauses(clauses: str):
+    return [{key: parse_value(value) for key, value in (criterion.split(":") for criterion in clause.split(","))} for clause in clauses]
+
+show_only = parse_clauses(args.show_only)
+hide = parse_clauses(args.hide)
 
 relevant_keys = set()
 relevant_keys |= display_params.keys()
-for show in show_only:
-    relevant_keys |= show.keys()
+for clauses in [show_only, hide]:
+    for clause in clauses:
+        relevant_keys |= clause.keys()
 
 def filter_params(params: StrDict):
     return {key: value for key, value in params.items() if key in relevant_keys}
@@ -245,11 +271,15 @@ for constant in args.constants:
     points = [(0, accuracy)]
     runs.append((params, points))
 
-def filter_run(run):
-    if len(args.show_only) == 0:
-        return True
+def matches(run, clauses, default):
+    if len(clauses) == 0:
+        return default
     params, _ = run
-    return any(all(key in params and params[key] == value for key, value in show.items()) for show in show_only)
+    value = any(all(key in params and params[key] == value for key, value in clause.items()) for clause in clauses)
+    return value
+
+def filter_run(run):
+    return matches(run, show_only, default=True) and not matches(run, hide, default=False)
 
 runs = [run for run in runs if filter_run(run)]
 
@@ -341,7 +371,7 @@ def param_value_sort_key(key: str):
 
 # force consistent order of display_kwargs assignment
 for key in {key for params, _ in runs for key in params.keys()}:
-    for value in sorted({params[key] for params, _ in runs}, key=param_value_sort_key(key)):
+    for value in sorted({params.get(key) for params, _ in runs}, key=param_value_sort_key(key)):
         get_param_kwargs(key, value)
 
 def normalize(kernel: list[float]):
@@ -351,6 +381,7 @@ def normalize(kernel: list[float]):
 def smooth_points(points: Points):
     if args.smooth is None:
         return points
+    from scipy.signal import savgol_filter
     steps, accuracies = transpose(points)
     accuracies = savgol_filter(accuracies, window_length=args.smooth, polyorder=min(args.smooth - 1, 3))
     return list(zip(steps, accuracies))
