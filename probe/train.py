@@ -12,6 +12,7 @@ import numpy as np
 
 import torch
 from torch.nn import functional as F
+from collections import defaultdict
 
 from transformers import AutoTokenizer
 
@@ -344,20 +345,16 @@ def eval_ensemble(ensemble, eval_dataloader, all_stats=False, print_results=Fals
 
 def print_probe_eval(layer_results, dataset, config):
     for layer_idx, task_results in enumerate(layer_results):
-        labels = ["total"]
-        if config.split_by_program_correctness:
-            labels += ["incorrect", "correct"]
-        accss = {label: [] for label in labels}
+        accss = defaultdict(lambda: [])
         for task_index, results in enumerate(task_results):
-            correct = {}
-            total = {}
-            for label in labels:
-                correct[label] = 0
-                total[label] = 0
-            for sample, probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
-                probe_correct = [tensor.item() for tensor in probe_correct]
+            correct = defaultdict(lambda: 0)
+            total = defaultdict(lambda: 0)
+            for sample, base_probe_correct in zip(dataset.filtered, results["correct_by_prog"]):
+                base_probe_correct = [tensor.item() for tensor in base_probe_correct]
+                probe_corrects = {"": base_probe_correct}
                 if config.last_state_only:
-                    probe_correct = [probe_correct[-1]]
+                    probe_corrects["_last"] = [base_probe_correct[-1]]
+                add_to_labels = {f"total{label_suffix}": probe_correct for label_suffix, probe_correct in probe_corrects.items()}
                 if config.only_differing_labels_under_mapping:
                     raw_code = sample["text"]
                     raw_code = post_process_output(raw_code)
@@ -366,7 +363,7 @@ def print_probe_eval(layer_results, dataset, config):
                     input, _ = sample["spec"][0]
                     start_x, start_y, _ = get_pos(input)
 
-                    def labels_for(code):
+                    def labels_for(code, probe_correct):
                         parser = KarelWithCurlyParser(run_with_trace=True)
                         parser.new_game(state=input)
                         parser.run(code)
@@ -375,27 +372,35 @@ def print_probe_eval(layer_results, dataset, config):
                         output = trace[code_length][0]
                         end_x, end_y, _ = get_pos(output)
                         (code_length,) = code_length
-                        if config.last_state_only:
-                            states = [parser.karel.state]
-                        else:
-                            states = [trace[(index + 1,)][0] for index in range(code_length)]
+                        # for last_state_only, only pick the last state
+                        start_index = code_length - len(probe_correct)
+                        states = [trace[(index + 1,)][0] for index in range(start_index, code_length)]
                         return [get_grid_label(state, start_x, start_y, end_x, end_y)[task_index] for state in states]
 
-                    probe_correct = [is_correct for is_correct, raw_labels, mapped_labels in zip(probe_correct, labels_for(raw_code), labels_for(mapped_code)) if raw_labels != mapped_labels]
+                    probe_corrects.update({
+                        f"{label_suffix}_differing": [
+                            is_correct
+                            for is_correct, raw_labels, mapped_labels
+                            in zip(probe_correct, labels_for(raw_code, probe_correct), labels_for(mapped_code, probe_correct))
+                            if raw_labels != mapped_labels
+                        ] for label_suffix, probe_correct in probe_corrects.items()
+                    })
 
-                add_to_labels = ["total"]
                 if config.split_by_program_correctness:
                     prog_correct = sample["results"][0]
-                    add_to_labels.append("correct" if prog_correct else "incorrect")
-                for label in add_to_labels:
+                    label_prefix = "correct" if prog_correct else "incorrect"
+                    for label_suffix, probe_correct in probe_corrects.items():
+                        label = label_prefix + label_suffix
+                        add_to_labels[label] = probe_correct
+                for label, probe_correct in add_to_labels.items():
                     correct[label] += sum(probe_correct)
                     total[label] += len(probe_correct)
-            for label, accs in accss.items():
+            for label in correct.keys():
                 if total[label]:
                     acc = correct[label] / total[label] * 100
-                    accs.append(acc)
+                    accss[label].append(acc)
                 else:
-                    accs.append("n/a")
+                    accss[label].append("n/a")
         for label, accs in accss.items():
             print(f"{layer_idx=} {label=} {accs=}")
 
