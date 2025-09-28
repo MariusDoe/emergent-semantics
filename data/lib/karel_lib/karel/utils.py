@@ -97,9 +97,8 @@ def beautify(code, tabspace=2):
 
 
 def makedirs(path):
-    if not os.path.exists(path):
-        print(" [*] Make directories : {}".format(path))
-        os.makedirs(path)
+    print(" [*] Make directories : {}".format(path))
+    os.makedirs(path, exist_ok=True)
 
 
 def get_rng(rng, seed=123):
