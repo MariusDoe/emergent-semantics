@@ -24,26 +24,28 @@ parser.add_argument("--constants", nargs="*", default=[])
 parser.add_argument("--params", nargs="*", default=[])
 parser.add_argument("--out", default="accuracy_plot.png")
 parser.add_argument("--title", default="Accuracy over Steps")
-parser.add_argument("--max_step", type=int)
+parser.add_argument("--max_x", type=int)
 parser.add_argument("--add_points", nargs="*", default=[])
 parser.add_argument("--show_only", nargs="*", default=[])
 parser.add_argument("--hide", nargs="*", default=[])
 parser.add_argument("--remap_steps", nargs="*", default=[])
 parser.add_argument("--debug", action="store_true")
 parser.add_argument("--smooth", type=int)
+parser.add_argument("--x", default="step")
+parser.add_argument("--y", default="accuracy")
 args = parser.parse_args()
 
-def skip_step(step: int):
-    if args.max_step is None:
+def skip_x(x: int):
+    if args.max_x is None:
         return False
-    return step > args.max_step
+    return x > args.max_x
 
 @dataclass(kw_only=True)
 class LineResult:
-    step: int | None = None
-    accuracy: float | None = None
+    emit_point: bool = False
     params: StrDict = field(default_factory=lambda: {})
     reset_params: bool = False
+    reset_params_after_lines: int | None = None
 
 Match = re.Match[str]
 Matcher = Callable[[str, StrDict], Generator[LineResult]]
@@ -63,10 +65,10 @@ def matcher(pattern_string: str):
 @matcher(r"step (\d+): acc: ([0-9.]+)")
 def model_training(match: Match, _params: StrDict):
     step = int(match.group(1))
-    if skip_step(step):
+    if skip_x(step):
         return
     accuracy = float(match.group(2))
-    yield LineResult(step=step, accuracy=accuracy, reset_params=True)
+    yield LineResult(emit_point=True, params={"step": step, "accuracy": accuracy}, reset_params=True)
 
 @matcher(r'^(?:args=)?Namespace\((.*)\)$')
 def namespace(match: Match, _params: StrDict):
@@ -100,7 +102,7 @@ def probe_step(match: Match, _params: StrDict):
     if "Wrote" in match.string:
         return
     step = int(match.group(1))
-    yield LineResult(step=step)
+    yield LineResult(params={"step": step})
 
 @matcher(r"with (\d+) layers")
 def layers(match: Match, _params: StrDict):
@@ -115,11 +117,11 @@ def probe_accuracy(match: Match, params: StrDict):
     for index, accuracy in enumerate(match.group(2).split(",")):
         new_params["task"] = task_names[index]
         try:
-            yield LineResult(accuracy=float(accuracy), params=new_params)
+            new_params["accuracy"] = float(accuracy)
         except ValueError:
-            pass
-    if not params.get("split_by_program_correctness") or program_correctness == "correct":
-        yield LineResult(reset_params=True)
+            continue
+        yield LineResult(emit_point=True, params=new_params)
+    yield LineResult(reset_params_after_lines=1)
 
 class hashabledict(dict):
     def __hash__(self):
@@ -162,19 +164,30 @@ def remove_suffix(string: str, prefix: str):
 def shorten_dataset(params: StrDict, key: str):
     name = params.get(key)
     if name is not None:
-        return name
+        return name, None
     name = params.get(f"{key}_name")
     if name is None:
-        return None
-    name = remove_prefix(name, "karel_")
-    name = remove_suffix(name, "_uniform_noloops_nocond")
-    return name
+        return None, None
+    match = re.match(r"karel_(.*)_uniform_noloops_nocond(?:_checkpoint_(\d+))?", name)
+    if not match:
+        return name, None
+    name = match.group(1)
+    checkpoint = match.group(2)
+    try:
+        checkpoint = int(checkpoint)
+    except ValueError:
+        checkpoint = None
+    return name, checkpoint
 
 def post_process_params(params: StrDict):
     params = params.copy()
+    step = params.get("step")
+    params["step"] = remap_steps.get(step, step)
     params["name"] = derive_name(params)
     for key in ["dataset", "probe_dataset"]:
-        params[key] = shorten_dataset(params, key)
+        name, checkpoint = shorten_dataset(params, key)
+        params[key] = name
+        params[f"{key}_checkpoint"] = checkpoint
     if "hidden_state_layer" in params:
         try:
             params["hidden_state_layer"] = int(params["hidden_state_layer"])
@@ -186,20 +199,21 @@ remap_steps = {old: new for old, new in (map(int, steps.split(":")) for steps in
 
 def find_points(lines: list[str]):
     params = {}
-    step = None
+    reset_after_lines = -1
     for line in lines:
         for matcher in matchers:
             for result in matcher(line, params):
                 params.update(result.params)
-                if result.step is not None:
-                    step = result.step
-                    step = remap_steps.get(step, step)
-                if result.accuracy is not None:
-                    assert step is not None, "accuracy without step"
-                    if not skip_step(step):
-                        yield params, step, result.accuracy
+                if result.emit_point:
+                    yield params
                 if result.reset_params:
                     params = {}
+                if result.reset_params_after_lines:
+                    reset_after_lines = result.reset_params_after_lines
+        if reset_after_lines == 0:
+            params = {}
+        if reset_after_lines >= 0:
+            reset_after_lines -= 1
 
 display_params: dict[str, str] = {key: display_key for key, display_key in (arg.split(":") for arg in args.params)}
 
@@ -224,22 +238,31 @@ for clauses in [show_only, hide]:
 def filter_params(params: StrDict):
     return {key: value for key, value in params.items() if key in relevant_keys}
 
-def parse_file(path: str, log_params: StrDict):
+def parse_file(path: str, log_params: StrDict, runs: defaultdict[hashabledict, Points]):
     with open(path) as log:
         lines = log.readlines()
-    runs: defaultdict[hashabledict, Points] = defaultdict(lambda: [])
-    for point_params, step, accuracy in find_points(lines):
+    for point_params in find_points(lines):
         combined_params = post_process_params({**log_params, **point_params})
-        combined_params = filter_params(combined_params)
-        runs[hashabledict(combined_params)].append((step, accuracy))
+        filtered_params = filter_params(combined_params)
+        assert args.x in combined_params and args.y in combined_params, params
+        x = combined_params[args.x]
+        y = combined_params[args.y]
+        if skip_x(x):
+            continue
+        runs[hashabledict(filtered_params)].append((x, y))
+
+def parse_files(logs: dict[str, StrDict]) -> list[tuple[StrDict, Points]]:
+    runs: defaultdict[hashabledict, Points] = defaultdict(lambda: [])
+    for path, log_params in logs.items():
+        parse_file(path, log_params, runs)
     if args.debug:
         for params, points in runs.items():
             print(params, len(points))
-    yield from runs.items()
+    return list(runs.items())
 
 def transpose(points: Points) -> tuple[list[int], list[float]]:
-    steps, accuracies = map(list, zip(*points))
-    return steps, accuracies
+    xs, ys = map(list, zip(*points))
+    return xs, ys
 
 logs: dict[str, StrDict] = {}
 current_params = {}
@@ -254,21 +277,13 @@ for log in args.logs:
     else:
         logs[log] = current_params.copy()
 
-runs = [run for log, params in logs.items() for run in parse_file(log, params)]
-
-for point in args.add_points:
-    step, accuracy = point.split(":")
-    step = int(step)
-    accuracy = float(accuracy)
-    point = (step, accuracy)
-    for _, points in runs:
-        points.append(point)
+runs = parse_files(logs)
 
 for constant in args.constants:
-    accuracy, *params = constant.split(",")
-    accuracy = float(accuracy)
+    y, *params = constant.split(",")
+    y = float(y)
     params = {key: parse_value(value) for key, value in (param.split(":") for param in params)}
-    points = [(0, accuracy)]
+    points = [(0, y)]
     runs.append((params, points))
 
 def matches(run, clauses, default):
@@ -284,20 +299,20 @@ def filter_run(run):
 runs = [run for run in runs if filter_run(run)]
 
 def point_sort_key(point: Point):
-    step, _ = point
-    return step
+    x, _ = point
+    return x
 
-runs = [(params, list(sorted(points, key=point_sort_key))) for params, points in runs]
+runs = [(params, list(sorted(set(points), key=point_sort_key))) for params, points in runs]
 
 if all(len(points) == 0 for _, points in runs):
     print("No points")
     exit()
 
-max_step = max(step for _, points in runs for step, _ in points)
+max_x = max(x for _, points in runs for x, _ in points)
 for _, points in runs:
     if len(points) == 1:
-        [(_, accuracy)] = points
-        points.append((max_step, accuracy))
+        [(_, y)] = points
+        points.append((max_x, y))
 
 def format_param(key: str, value: Any):
     if key == "learning_rate":
@@ -382,9 +397,9 @@ def smooth_points(points: Points):
     if args.smooth is None:
         return points
     from scipy.signal import savgol_filter
-    steps, accuracies = transpose(points)
-    accuracies = savgol_filter(accuracies, window_length=args.smooth, polyorder=min(args.smooth - 1, 3))
-    return list(zip(steps, accuracies))
+    xs, ys = transpose(points)
+    ys = savgol_filter(ys, window_length=args.smooth, polyorder=min(args.smooth - 1, 3))
+    return list(zip(xs, ys))
 
 runs = [(params, smooth_points(points)) for params, points in runs]
 
@@ -393,9 +408,10 @@ for params, points in runs:
     if not points:
         continue
     kwargs = get_params_kwargs(params)
-    steps, accuracies = transpose(points)
-    plt.plot(steps, accuracies, **kwargs)
+    xs, ys = transpose(points)
+    plt.plot(xs, ys, **kwargs)
 
+plt.ylim(0, None)
 plt.xlabel("Step")
 plt.ylabel("Accuracy")
 plt.title(args.title)
