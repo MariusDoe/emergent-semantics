@@ -75,7 +75,7 @@ def main():
     }
 
     # Make directories
-    data_dir = os.path.join(__file__, "..", "data", config.data_dir)
+    data_dir = os.path.join(os.path.dirname(__file__), "data", config.data_dir)
     if config.use_move_twice:
         stmt_weights["move_twice"] = 2
     if config.use_move_left:
