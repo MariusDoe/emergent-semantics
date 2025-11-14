@@ -214,13 +214,13 @@ def generate_random_with_distribution(
                     if state.num_interesting_pushes > 0:
                         start_states.append(start_state)
                         states.append(state)
-            yield mapped_program, start_states
-    programs = generate_dataset(generate_programs())
+            yield program, start_states
+    programs = generate_dataset(generate_programs(), mapping)
     assert sum(distribution) == 0
     assert len(programs) == total
     return programs
 
-def generate_dataset(generator):
+def generate_dataset(generator, mapping=[]):
     programs = []
     for program, start_states in generator:
         record = {}
@@ -230,9 +230,10 @@ def generate_dataset(generator):
             record[f"input{idx}"] = karel_to_string(start_states[idx])
             np_record[f"input{idx}"] = start_states[idx].state
 
+        mapped_program = map_actions(program, mapping)
         for idx in range(len(start_states)):
             parser.karel = copy.deepcopy(start_states[idx])
-            parser.run(program)
+            parser.run(mapped_program)
             end_state = parser.karel
             record[f"output{idx}"] = karel_to_string(end_state)
             np_record[f"output{idx}"] = end_state.state
