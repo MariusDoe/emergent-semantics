@@ -939,7 +939,7 @@ def eval_with_config_and_model(
                 torch.save(semantic_eval_ds[last_total:total], semantic_ds_part)
 
     if make_dataset:
-        generated_dataset = generate_dataset(generated_programs)
+        generated_dataset = generate_dataset(generated_programs, config.mapping)
         without_ext, _ = os.path.splitext(make_dataset_path)
         save_dataset(generated_dataset, without_ext)
 
